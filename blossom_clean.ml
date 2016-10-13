@@ -846,15 +846,10 @@ let contract_blossom_in_graph blossom graph =
   in
   let meta_vertex = find_new_vertex_name graph in
   let meta_in_arcs =
-    Printf.printf "New vertex : %d\n" meta_vertex;
     update_arcs (extract Graph.delta_in) blossom meta_vertex in
   let meta_out_arcs =
-    Printf.printf "meta_in_arcs : ";
-    print_eset meta_in_arcs; Printf.printf "\n" ;
     update_arcs (extract Graph.delta_out) blossom meta_vertex in
   let arcs =
-    Printf.printf "meta_out_arcs : ";
-    print_eset meta_out_arcs ; Printf.printf "\n";
     ESet.union meta_out_arcs meta_in_arcs in
   let cleaned_graph =
     remove_vertices_from_graph
@@ -863,20 +858,6 @@ let contract_blossom_in_graph blossom graph =
          graph)
       blossom
   in
-  print_delta_in graph;
-  Printf.printf "\n";
-  print_delta_in cleaned_graph;
-  Printf.printf "\n";
-  print_delta_out graph;
-  Printf.printf "\n";
-  print_delta_out cleaned_graph;
-  Printf.printf "\nBlossom : ";
-  print_vertex_list blossom;
-  Printf.printf "\narcs : ";
-  print_eset arcs;
-  Printf.printf "\narcs : ";
-  print_eset (ESet.remove (meta_vertex, meta_vertex) arcs);
-  Printf.printf "\n";
   ESet.fold
     (fun (src, dst) accu ->
        (* Est-ce quon peut avoir un graphe orienté ?????? add_arc ou add_edge???? *)
@@ -889,8 +870,9 @@ let rec remove_blossom_from_tree (x, y) tree =
     match get_node tree x with
     | Some(path) -> path
     | None ->
-      Printf.printf "remove_blossom_from_tree error : path from %d to %d do not exist in the tree.\n" x y;
-      Node(0, [])
+      Printf.printf "remove_blossom_from_tree error : path from %d to %d\
+                     do not exist in the tree.\n" x y;
+      Node(-1, [])
   in
   match tree with
   | Node(v, []) ->
@@ -1049,8 +1031,10 @@ let couplage = ESet.empty
 let rec remove_blossom_from_tree (x, y) tree =
   Printf.printf "edge : (%d, %d)\n" x y;
   let contract_blossom x y tree =
-    match get_node tree x with
-    | Some(path) -> path
+    match get_node tree y with
+    | Some(path) ->
+      Printf.printf "Found %d/n" y;
+      path
     | None ->
       Printf.printf "remove_blossom_from_tree error : path\
                      from %d to %d do not exist in the tree.\n" x y;
@@ -1060,14 +1044,16 @@ let rec remove_blossom_from_tree (x, y) tree =
   | Node(v, []) ->
     Printf.printf "sommet : %d\n" v;
     if (v == x || v == y) then
-      Printf.printf "remove_blossom_from_tree error : blossom begins at a leaf of the tree.\n"
+      Printf.printf "remove_blossom_from_tree error : blossom\
+                     begins at a leaf of the tree.\n"
     else
       Printf.printf "" ;
     Node(v, [])
   | Node(v, childs) ->
     Printf.printf "sommet : %d\n" v;
     if v == x  then
-      contract_blossom x y tree
+      (Printf.printf "Found %d\n" v ;
+      contract_blossom x y tree)
     else if v == y  then
       contract_blossom y x tree
     else
