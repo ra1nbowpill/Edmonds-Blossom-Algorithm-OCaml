@@ -496,7 +496,9 @@ module Tree = struct
   let rec vertices = function node ->
     (value node)::List.fold_left (fun accu node -> (vertices node)@accu) [] (childs node)
 
-  let rec arcs = function Node(node_value, node_childs) ->
+  let rec arcs = function
+    | Node(_, []) -> []
+    | Node(node_value, node_childs) ->
     (node_value, value (List.hd node_childs))
     :: List.fold_left (fun accu node -> (arcs node)@accu) [] node_childs
 
@@ -514,36 +516,38 @@ module Tree = struct
     | None -> None
     | Some(node) -> Some(path_to dst node)
 
-  (* Getters with parite *)
+  (* Getters with parity *)
 
-  let rec p_vertices parite = function Node(v, childs) ->
+  let rec p_vertices parity = function Node(v, childs) ->
       let res =
-        List.fold_left (fun accu node -> (p_vertices (not parite) node)@accu) [] childs
+        List.fold_left (fun accu node -> (p_vertices (not parity) node)@accu) [] childs
       in
-      if parite then v::res
+      if parity then v::res
       else res
 
-  let rec p_arcs parite = function Node(node_value, node_childs) ->
+  let rec p_arcs parity = function
+    | Node(_, []) -> []
+    | Node(node_value, node_childs) ->
     let res =
-      List.fold_left (fun accu node -> (p_arcs (not parite) node)@accu) [] node_childs
+      List.fold_left (fun accu node -> (p_arcs (not parity) node)@accu) [] node_childs
     in
-    if parite then
+    if parity then
       (node_value, value (List.hd node_childs))::res
     else res
 
-  let p_path_to parite vertex  =
-    let rec my_fun accu parite = function
+  let p_path_to parity vertex  =
+    let rec my_fun accu parity = function
       | Node(node_value, node_childs) ->
         if node_value = vertex then accu
         else
-          let aaa elt lst parite =
-            if parite then elt::lst else lst
+          let aaa elt lst parity =
+            if parity then elt::lst else lst
           in
           List.fold_left
-            (fun ac no -> (my_fun (aaa node_value accu parite) (not parite) no)@ac)
+            (fun ac no -> (my_fun (aaa node_value accu parity) (not parity) no)@ac)
             [] node_childs
     in
-    my_fun [] parite
+    my_fun [] parity
 
   let even_vertices = p_vertices true
   let uneven_vertices = p_vertices false
