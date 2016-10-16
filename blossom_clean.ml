@@ -485,29 +485,133 @@ module Tree = struct
 
   let childs = function Node(_, childs) -> childs
 
+  (* Tree management *)
+
+  let rec depth = function
+    | Node(v, childs) ->
+      1 + List.fold_left (fun accu node -> max accu (depth node)) (-1) childs
+
+  let rec size = function
+    | Node(v, childs) ->
+      List.fold_left (fun accu node -> accu + (size node)) 1 childs
+
+  let is_leaf tree = (childs tree) = []
+
   let rec find vertex = function node ->
-      if (value node) == vertex then Some(node)
-      else List.fold_left
-          (fun accu node -> match accu with
-             | Some(a) -> Some(a)
-             | None -> find vertex node)
-          None (childs node)
+    if (value node) == vertex then Some(node)
+    else List.fold_left
+        (fun accu node -> match accu with
+           | Some(a) -> Some(a)
+           | None -> find vertex node)
+        None (childs node)
+
+  let unsafe_find vertex tree =
+    match find vertex tree with
+    | Some(a) -> a
+    | None -> failwith "Not_Found"
+
+  let rec mem vertex = function node ->
+    if (value node) == vertex then true
+    else List.fold_left
+        (fun accu node ->
+           if not accu then mem vertex node
+           else accu)
+        false (childs node)
+
+  let rec add (x, y) tree =
+    let my_fun (x, y) = function
+      | Node(v, childs) ->
+        if v == x then Node(v, (Node(y, []))::childs)
+        else Node(v, List.map (fun node -> add (x, y) node) childs)
+    in
+    if not (mem x tree) || (mem y tree) then
+      tree
+    else
+      my_fun (x, y) tree
+
+  let remove vertex tree =
+    let rec my_fun = function
+      | Node(node_value, node_childs) ->
+        let new_list = List.fold_left
+            (fun new_list node ->
+               if (value node) = vertex then new_list
+               else (my_fun node)::new_list)
+            [] node_childs
+        in
+        Node(node_value, new_list)
+    in
+    if not (mem vertex tree) then
+      tree
+    else
+      my_fun tree
+
+
+  let find_vertices vertices tree =
+    List.fold_left (fun accu vertex -> (unsafe_find vertex tree)::accu) [] vertices
+
+  let remove_vertices vertices tree =
+    List.fold_left (fun accu vertex -> remove vertex accu) tree vertices
+
+  let rec contract_path name path = function node ->
+    Node(value node, List.map
+           (fun node ->
+              if value node = List.hd path then
+                let ma_liste = List.map (remove_vertices path) (find_vertices path node) in
+                Node(name, List.fold_left (fun accu node -> (childs node)@accu) [] ma_liste)
+              else
+                contract_path name path node
+           ) (childs node))
+
+  (* Functions *)
 
   let rec vertices = function node ->
     (value node)::List.fold_left (fun accu node -> (vertices node)@accu) [] (childs node)
 
   let rec arcs = function
-    | Node(_, []) -> []
     | Node(node_value, node_childs) ->
-    (node_value, value (List.hd node_childs))
-    :: List.fold_left (fun accu node -> (arcs node)@accu) [] node_childs
+      List.fold_left
+        (fun accu node ->
+           (node_value, value node)::(arcs node)@accu)
+        []
+        node_childs
+
+  (*let vertex tree =
+    let rec my_fun vertices tree = match tree with
+      | Node(node_value, []) -> node_value::vertices
+      | Node(node_value, node_childs) ->
+        List.fold_left
+          (fun all_vertex node ->
+             (my_fun ((value node)::all_vertex) node)
+          )
+          (vertices)
+          node_childs
+    in
+    (my_fun [] tree)@[(value tree)]
+
+    let vertex tree =
+    let rec my_fun vertices tree = match tree with
+      | Node(node_value, []) -> vertices
+      | Node(node_value, node_childs) ->
+        List.fold_left
+          (fun all_vertex node ->
+             (my_fun ((node_value, value node)::all_vertex) node)
+          )
+          (vertices)
+          node_childs
+    in
+    (my_fun [] tree)*)
 
   let path_to vertex =
     let rec my_fun accu = function
       | Node(node_value, node_childs) ->
-        if node_value = vertex then accu
+        if node_value = vertex then node_value::accu
         else
-          List.fold_left (fun ac no -> (my_fun (node_value::accu) no)@ac) [] node_childs
+          List.fold_left
+            (fun ac no ->
+               if ac = [] then
+                 (my_fun (node_value::accu) no)
+               else ac)
+            [] node_childs
     in
     my_fun []
 
@@ -519,30 +623,31 @@ module Tree = struct
   (* Getters with parity *)
 
   let rec p_vertices parity = function Node(v, childs) ->
-      let res =
-        List.fold_left (fun accu node -> (p_vertices (not parity) node)@accu) [] childs
-      in
-      if parity then v::res
-      else res
+    let res =
+      List.fold_left (fun accu node -> (p_vertices (not parity) node)@accu) [] childs
+    in
+    if parity then v::res
+    else res
 
   let rec p_arcs parity = function
-    | Node(_, []) -> []
     | Node(node_value, node_childs) ->
-    let res =
-      List.fold_left (fun accu node -> (p_arcs (not parity) node)@accu) [] node_childs
-    in
-    if parity then
-      (node_value, value (List.hd node_childs))::res
-    else res
+      let my_fun =
+        if parity then
+          (fun accu node -> (node_value, value node)::(p_arcs (not parity) node)@accu)
+        else
+          (fun accu node -> (p_arcs (not parity) node)@accu)
+      in
+      List.fold_left my_fun [] node_childs
 
   let p_path_to parity vertex  =
     let rec my_fun accu parity = function
       | Node(node_value, node_childs) ->
-        if node_value = vertex then accu
+        let aaa elt lst parity =
+          if parity then elt::lst else lst
+        in
+        if node_value = vertex then
+          aaa node_value accu parity
         else
-          let aaa elt lst parity =
-            if parity then elt::lst else lst
-          in
           List.fold_left
             (fun ac no -> (my_fun (aaa node_value accu parity) (not parity) no)@ac)
             [] node_childs
@@ -558,35 +663,19 @@ module Tree = struct
   let even_path_to = p_path_to true
   let uneven_path_to = p_path_to false
 
-  let rec arcs_of_path = function
+  let rec p_arcs_of_path parite = function
     | [] -> []
     | [elt] -> []
     | elt1::elt2::next ->
-      (elt1, elt2)::arcs_of_path (elt2::next)
+      if parite then
+        (elt1, elt2)::p_arcs_of_path (not parite) (elt2::next)
+      else
+        p_arcs_of_path (not parite) (elt2::next)
 
   let even_arcs_to dst tree =
-    arcs_of_path (even_path_to dst tree)
+    p_arcs_of_path true (path_to dst tree)
   let uneven_arcs_to dst tree =
-    arcs_of_path (uneven_path_to dst tree)
-
-  (* Tree management *)
-
-  let rec depth = function
-    | Node(v, childs) ->
-      1 + List.fold_left (fun accu node -> max accu (depth node)) (-1) childs
-
-  let rec size = function
-    | Node(v, childs) ->
-      List.fold_left (fun accu node -> accu + (size node)) 1 childs
-
-  let is_leaf tree = (childs tree) = []
-
-  let rec add (x, y) = function
-    | Node(v, childs) ->
-      if v == x then Node(v, (Node(y, []))::childs)
-      else Node(v, List.map (fun node -> add (x, y) node) childs)
-
-  let rec remove vertex = function node -> node
+    p_arcs_of_path false (path_to dst tree)
 
   (* Conversions *)
 
@@ -601,28 +690,24 @@ module Tree = struct
       List.iter (iter f) (childs node)
 
   let rec print =  function Node(v, childs) ->
-      print_int v;
-      Printf.printf "{";
-      List.iter (fun node -> print node; Printf.printf ",") childs;
-      Printf.printf "}"
+    let rec my_fun = function
+      | [] -> ()
+      | elt::[] -> print elt
+      | head::tail -> print head ; Printf.printf "," ; my_fun tail
+    in
+    Printf.printf "%d" v;
+    if childs <> [] then Printf.printf " {";
+    my_fun childs;
+    if childs <> [] then Printf.printf "}"
 
   (* Constructors *)
 
   let create_node v = Node(v, [])
-  let tree_of_arcs =
+  let of_arcs =
     List.fold_left (fun tree arc -> add arc tree) (create_node 1)
-  let tree_of_eset arcs = tree_of_arcs (Graph.ESet.elements arcs)
+  let of_eset arcs = of_arcs (Graph.ESet.elements arcs)
 
 end
-
-
-
-
-
-
-
-
-
 
 
 
@@ -706,8 +791,6 @@ let remove_tree_from_graph graph tree =
   let vertices = Tree.vertices tree in
   remove_vertices_from_graph graph vertices
 
-let neighboors_of vertex graph =
-  Graph.out_neighbours vertex graph
 
 (* Couplage & Graph getters *)
 
@@ -738,7 +821,7 @@ let case_a graph couplage tree =
     | x::next ->
       let solutions =
         VSet.diff
-          (neighboors_of x graph)
+          (Graph.out_neighbours x graph)
           (VSet.union
              (saturated_vertices couplage)
              (Tree.vset tree))
@@ -759,7 +842,7 @@ let case_b graph couplage tree =
     | y::next ->
       let zs = VSet.diff
           (VSet.inter
-             (neighboors_of y graph)
+             (Graph.out_neighbours y graph)
              (couplage_neighboors_of y couplage))
           (VSet.add y (Tree.vset tree))
       in
@@ -773,7 +856,7 @@ let case_b graph couplage tree =
     | [] -> None
     | x::next ->
       let ys = VSet.diff
-          (neighboors_of x graph)
+          (Graph.out_neighbours x graph)
           (VSet.union
              (Tree.vset tree)
              (couplage_neighboors_of x couplage))
@@ -796,7 +879,7 @@ let case_c graph couplage tree =
       let p2 = VSet.diff
           (VSet.inter
              (VSet.remove p1 (VSet.of_list even_v))
-             (neighboors_of p1 graph))
+             (Graph.out_neighbours p1 graph))
           (couplage_neighboors_of p1 couplage)
       in
       if VSet.is_empty p2 then
@@ -892,7 +975,7 @@ let add_path_to_couplage couplage tree last =
     (ESet.of_list (Tree.even_arcs_to last tree))
     (ESet.diff
        couplage
-      (ESet.of_list (Tree.uneven_arcs_to last tree)))
+       (ESet.of_list (Tree.uneven_arcs_to last tree)))
 
 (* Actions for cases *)
 
@@ -1004,17 +1087,17 @@ let graph = graph_of_list graph_list
 let couplage = eset_of_list couplage_list
 let tree = tree_of_list tree_list
 
-let _ = VSet.elements (saturated_vertices couplage)             (* 1,2,3,6,8,9 *)
-let _ = VSet.elements (unsaturated_vertices graph couplage)     (* 4,5,7,10 *)
-let _ = ESet.elements (Tree.eset tree)                       (* [(5,7);(7,4)] *)
-let _ = VSet.elements (Tree.vset tree)                       (* 5,7,4,6,8 *)
-let _ = Tree.even_vertices tree                      (* 5,8,4 *)
-let _ = Tree.uneven_vertices tree                    (* 6,7 *)
+(*let _ = VSet.elements (saturated_vertices couplage)             (* 1,2,3,6,8,9 *)
+  let _ = VSet.elements (unsaturated_vertices graph couplage)     (* 4,5,7,10 *)
+  let _ = ESet.elements (Tree.eset tree)                       (* [(5,7);(7,4)] *)
+  let _ = VSet.elements (Tree.vset tree)                       (* 5,7,4,6,8 *)
+  let _ = Tree.even_vertices tree                      (* 5,8,4 *)
+  let _ = Tree.uneven_vertices tree                    (* 6,7 *)
 
-let _ = Tree.even_arcs_to 8 tree
-let _ = Tree.uneven_arcs_to 8 tree
+  let _ = Tree.even_arcs_to 8 tree
+  let _ = Tree.uneven_arcs_to 8 tree*)
 
-(*let _ = do_blossom graph*)
+let _ = do_blossom graph
 
 let blossom_edge = match  case_c graph couplage tree with | Some(edge) -> edge | None -> (0,0)
 let my_blossom = find_blossom blossom_edge tree
@@ -1031,6 +1114,52 @@ let x =
 let _ = print_delta_in x
 let _ = print_delta_out x
 
-let _ = Tree.find 2 tree
+(*
+let list = [(1,2);(1,3);(1,4);(1,5);
+            (2,6);(2,7);(2,8);(2,9);
+            (3,10);(3,11);(3,12);(3,13);
+            (4,14);(4,15);(4,16);(4,17);
+            (5,18);(5,19);(5,20);(5,21);
+            (6,22);(6,23);(6,24);(6,25);
+            (11,26);(11,27);(11,28)]
+let tree = Tree.of_arcs list
+open Tree
+let _ = value tree (* 1 *)
+let _ = childs tree (* 5 4 3 2 *)
+let _ = find 5 tree (* Node (5, [21, 20, 19, 18]) *)
+let _ = vertices tree (* 1 2 3 4 ... 28 *)
+let _ = arcs tree  (* (1,2) (2,6) (6,22) ... (2,7) ... (5,21) *)
+let _ = path_to 28 tree (* 28 11 3 1 *)
+let _ = path_from_to 3 26 tree (* 3 11 26 *)
+let _ = even_vertices tree (* 1 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 *)
+let _ = uneven_vertices tree (* 2 22 23 24 25 3 26 27 28 4 5 *)
+let _ = even_arcs tree (* (1,2) (6,22...)) (1,3) (11, 26...) (1,4) (1,5) *)
+let _ = uneven_arcs tree (* (2,6...) (3,10...) (4,14...) (5,18...) *)
+let _ = even_path_to 28 tree (* 11 1 *)
+let _ = uneven_path_to 28 tree (* 28 3 *)
+let _ = even_arcs_to 28 tree (* 28,11 3,1*)
+let _ = uneven_arcs_to 28 tree (* 11,3 *)
+let _ = depth tree
+let _ = size tree
+let a = match find 28 tree with | Some (a) ->a | None -> create_node 0
+let _ = is_leaf a
+let _ = add (27, 28) tree (* TODO if mem (fst edge) then tree else add *)
+let _ = Graph.ESet.elements (eset tree)
+let _ = Graph.VSet.elements (vset tree)
+let _ = iter (function node -> print_int (value node); Printf.printf " ") tree
+let _ = print tree
+let _ = create_node 5
+let _ = mem (29) tree
+let _ = add (18,1) tree
+let _ = add (0,100) tree
+let _ = add (16,30) tree
+let _ = remove 5 tree
+*)
 
-(* TODO : Revoir remove_blossom_from_tree *)
+
+(*let list = [(1,2);(2,3);(2,13);(3,4);(4,5);(4,6);(3,7);(7,8);(8,10);(7,9);(9,14);(9,11);(9,12);(12,15)]
+  let tree = Tree.of_arcs list
+  let path = [2;3;7]
+  let a = Tree.find_vertices path tree
+  let _ = List.map (fun node -> Tree.remove_vertices path  node) a
+  let _ = Tree.contract_path (-1) path tree*)
