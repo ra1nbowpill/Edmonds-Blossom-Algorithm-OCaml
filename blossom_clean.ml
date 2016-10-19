@@ -476,7 +476,7 @@ module Tree = struct
 
   (* Arbitrary tree *)
 
-  type value = int
+  type value = Graph.vertex
   type t = Node of (value * t list)
 
   (* Getters *)
@@ -575,32 +575,6 @@ module Tree = struct
         []
         node_childs
 
-  (*let vertex tree =
-    let rec my_fun vertices tree = match tree with
-      | Node(node_value, []) -> node_value::vertices
-      | Node(node_value, node_childs) ->
-        List.fold_left
-          (fun all_vertex node ->
-             (my_fun ((value node)::all_vertex) node)
-          )
-          (vertices)
-          node_childs
-    in
-    (my_fun [] tree)@[(value tree)]
-
-    let vertex tree =
-    let rec my_fun vertices tree = match tree with
-      | Node(node_value, []) -> vertices
-      | Node(node_value, node_childs) ->
-        List.fold_left
-          (fun all_vertex node ->
-             (my_fun ((node_value, value node)::all_vertex) node)
-          )
-          (vertices)
-          node_childs
-    in
-    (my_fun [] tree)*)
-
   let path_to vertex =
     let rec my_fun accu = function
       | Node(node_value, node_childs) ->
@@ -689,17 +663,6 @@ module Tree = struct
       node -> f node;
       List.iter (iter f) (childs node)
 
-  let rec print =  function Node(v, childs) ->
-    let rec my_fun = function
-      | [] -> ()
-      | elt::[] -> print elt
-      | head::tail -> print head ; Printf.printf "," ; my_fun tail
-    in
-    Printf.printf "%d" v;
-    if childs <> [] then Printf.printf " {";
-    my_fun childs;
-    if childs <> [] then Printf.printf "}"
-
   (* Constructors *)
 
   let create_node v = Node(v, [])
@@ -717,13 +680,24 @@ module ESet = Graph.ESet
 
 (* *** Printing functions *** *)
 
-let rec print_list print_elt ?(print_last_elt=(print_elt)) lst =
+let rec print_tree =  function Tree.Node(v, childs) ->
+  let rec my_fun = function
+    | [] -> ()
+    | elt::[] -> print_tree elt
+    | head::tail -> print_tree head ; Printf.printf "," ; my_fun tail
+  in
+  Printf.printf "%d" v;
+  if childs <> [] then Printf.printf " {";
+  my_fun childs;
+  if childs <> [] then Printf.printf "}"
+
+let rec print_list_base print_elt ?(print_last=(print_elt)) lst =
   match lst with
+  | [elt] -> print_last elt
   | [] -> ()
-  | [elt] -> print_last_elt elt
   | head::tail ->
     print_elt head;
-    print_list print_elt tail
+    print_list_base print_elt tail
 
 let print_couple print_fst print_snd (x, y) =
   Printf.printf "(";
@@ -732,13 +706,24 @@ let print_couple print_fst print_snd (x, y) =
 
 let print_int = Printf.printf "%d"
 
+
+let print_list_beauty print_elt lst=
+  Printf.printf "[";
+  print_list_base
+    (fun a -> print_elt a ; Printf.printf ", ")
+    ~print_last:print_elt
+    lst;
+  Printf.printf "]"
+
+let print_list = print_list_beauty
+
 let print_int_list = print_list print_int
 
 let print_vertex = print_int
-let print_vertex_list = print_list print_vertex
+let print_vertex_list = print_list_beauty print_vertex
 
-let print_arc = print_couple (print_int) (print_int)
-let print_arc_list = print_list print_arc
+let print_arc = print_couple (print_vertex) (print_vertex)
+let print_arc_list = print_list_beauty print_arc
 
 let print_eset eset =
   print_arc_list (ESet.elements eset)
@@ -766,6 +751,16 @@ let rec vset_of_eset edges =
     (fun (x, y) accu -> VSet.add x (VSet.add y accu))
     edges
     VSet.empty
+
+let eset_of_vset vertex vertices =
+  VSet.fold
+    (fun elt accu -> ESet.add (vertex, elt) accu)
+    vertices
+    ESet.empty
+
+let couple_of_list fst list =
+  List.map (fun a -> (fst, a)) list
+
 
 let vset_of_list vertices =
   List.fold_right VSet.add vertices VSet.empty
@@ -815,66 +810,131 @@ let couplage_neighboors_of vertex couplage =
 
 let case_a graph couplage tree =
   let even_v = Tree.even_vertices tree in
-  let rec my_fun list_even =
-    match list_even with
-    | [] -> None
-    | x::next ->
-      let solutions =
-        VSet.diff
-          (Graph.out_neighbours x graph)
-          (VSet.union
-             (saturated_vertices couplage)
-             (Tree.vset tree))
-      in
-      if VSet.is_empty solutions then
-        my_fun next
-      else
-        let sol = VSet.choose solutions in
-        Some(x, sol)
+  let compute_solutions vertex =
+    VSet.diff
+      (Graph.out_neighbours vertex graph)
+      (VSet.union
+         (saturated_vertices couplage)
+         (Tree.vset tree))
   in
-  my_fun even_v
+  let solutions =
+    List.fold_left
+      (fun accu vertex ->
+         ESet.union
+           (eset_of_vset vertex (compute_solutions vertex))
+           accu)
+      ESet.empty even_v
+  in
+  let chosen =
+    if ESet.is_empty solutions then None
+    else Some(ESet.choose solutions)
+  in
+  Printf.printf "choices:\n";
+  print_eset solutions;Printf.printf "\n";
+  chosen
 
-let case_b graph couplage tree =
+let new_case_b graph couplage tree =
   let even_v = Tree.even_vertices tree in
+  let compute_ys vertex =
+    VSet.diff
+      (Graph.out_neighbours vertex graph)
+      (VSet.union
+         (Tree.vset tree)
+         (couplage_neighboors_of vertex couplage))
+  in
+  let compute_zs vertex =
+    VSet.diff
+      (VSet.inter
+         (Graph.out_neighbours vertex graph)
+         (couplage_neighboors_of vertex couplage))
+      (VSet.add vertex (Tree.vset tree))
+  in
+  let blabla f lst=
+    List.fold_left (fun accu x -> (f x)@accu) [] lst
+  in
+  let for_each_y ys =
+    blabla (fun y -> (List.map (fun z -> (y,z))
+                        (VSet.elements (compute_zs y)))) ys
+  in
+  let for_each_x xs =
+    blabla (fun x -> (List.map (fun (y,z) -> (x,y,z))
+                        (for_each_y (VSet.elements (compute_ys x))) )) xs
+  in
+  let solutions = for_each_x even_v in
+  let chosen =
+    if solutions = [] then None
+    else Some(List.hd solutions)
+  in
+  chosen
+
+let old_case_b graph couplage tree =
+  let even_v = Tree.even_vertices tree in
+  let compute_ys vertex =
+    VSet.diff
+      (Graph.out_neighbours vertex graph)
+      (VSet.union
+         (Tree.vset tree)
+         (couplage_neighboors_of vertex couplage))
+  in
+  let compute_zs vertex =
+    VSet.diff
+      (VSet.inter
+         (Graph.out_neighbours vertex graph)
+         (couplage_neighboors_of vertex couplage))
+      (VSet.add vertex (Tree.vset tree))
+  in
   let rec my_fun2 ys =
     match ys with
     | [] -> None
     | y::next ->
-      let zs = VSet.diff
-          (VSet.inter
-             (Graph.out_neighbours y graph)
-             (couplage_neighboors_of y couplage))
-          (VSet.add y (Tree.vset tree))
-      in
+      let zs = compute_zs y in
       if VSet.is_empty zs then
         my_fun2 next
       else
-        Some(y, VSet.choose zs)
+         Some(y, VSet.choose zs)
   in
   let rec my_fun list_even =
     match list_even with
     | [] -> None
     | x::next ->
-      let ys = VSet.diff
-          (Graph.out_neighbours x graph)
-          (VSet.union
-             (Tree.vset tree)
-             (couplage_neighboors_of x couplage))
-      in
+      let ys = compute_ys x in
       if VSet.is_empty ys then
         my_fun next
       else
-        match my_fun2 (VSet.elements ys) with
-        | None -> my_fun next
-        | Some(y, z) -> Some(x, y, z)
+         match my_fun2 (VSet.elements ys) with
+         | None -> my_fun next
+         | Some(y, z) -> Some(x, y, z)
   in
   my_fun even_v
 
-let case_c graph couplage tree =
+let case_b = new_case_b
+
+let new_case_c graph couplage tree =
+  let even_v = Tree.even_vertices tree in
+  let neighboors_in_tree_edge_not_in vertex =
+    VSet.diff
+      (VSet.inter
+         (VSet.remove vertex (VSet.of_list even_v))
+         (Graph.out_neighbours vertex graph))
+      (couplage_neighboors_of vertex couplage)
+  in
+  let solutions =
+    List.fold_left (fun accu vertex ->
+        (List.map (fun elt -> (vertex,elt))
+           (VSet.elements (neighboors_in_tree_edge_not_in vertex)))@accu)
+      [] even_v
+  in
+  let chosen =
+    if solutions = [] then None
+    else Some(List.hd solutions)
+  in
+  chosen
+
+let old_case_c graph couplage tree =
   let even_v = Tree.even_vertices tree in
   let rec my_fun list_even =
     match list_even with
-    | [] -> None
+    | [] -> Printf.printf "empty\n" ; None
     | p1::next ->
       let p2 = VSet.diff
           (VSet.inter
@@ -885,9 +945,14 @@ let case_c graph couplage tree =
       if VSet.is_empty p2 then
         my_fun next
       else
-        Some(p1, VSet.choose p2)
+        (Printf.printf "\t%d : " p1; print_vset p2;Printf.printf "\n";
+         Printf.printf "chosen : (%d,%d)\n" p1 (VSet.choose p2);
+         Some(p1, VSet.choose p2))
   in
+  Printf.printf "choices:\n";
   my_fun even_v
+
+let case_c = new_case_c
 
 (* blossom management *)
 
@@ -987,8 +1052,7 @@ let rec test_case_a graph couplage tree =
                 Tree.uneven_arcs_to (snd edge) (Tree.add edge tree)) in
     Printf.printf "√ : ";
     print_arc_list (fst path);
-    print_arc_list (snd path);
-    Printf.printf "\n";
+    print_arc_list (snd path);Printf.printf "\n";
     (graph, add_path_to_couplage couplage (Tree.add edge tree) (snd edge))
   | None ->
     Printf.printf "X\n";
@@ -1014,8 +1078,7 @@ and test_case_c graph couplage tree =
     Printf.printf "√\n";
     let blossom = find_blossom edge tree in
     Printf.printf "Un cycle a été trouvé : ";
-    print_int_list blossom;
-    Printf.printf "\n";
+    print_int_list blossom;Printf.printf "\n";
     test_case_a
       (contract_blossom_in_graph blossom graph)
       couplage
@@ -1098,21 +1161,20 @@ let tree = tree_of_list tree_list
   let _ = Tree.uneven_arcs_to 8 tree*)
 
 let _ = do_blossom graph
+(*let blossom_edge = match  case_c graph couplage tree with | Some(edge) -> edge | None -> (0,0)
+  let my_blossom = find_blossom blossom_edge tree
+  let new_tree = remove_blossom_from_tree blossom_edge tree
+  let new_graph = contract_blossom_in_graph my_blossom graph*)
 
-let blossom_edge = match  case_c graph couplage tree with | Some(edge) -> edge | None -> (0,0)
-let my_blossom = find_blossom blossom_edge tree
-let new_tree = remove_blossom_from_tree blossom_edge tree
-let new_graph = contract_blossom_in_graph my_blossom graph
+(*let _ = print_tree tree*)
 
-let _ = Tree.print tree
-
-let x =
+(*let x =
   Graph.empty
   |> Graph.add_arc ~src:1 ~dst:2
   |> Graph.add_arc ~src:2 ~dst:1
   |> Graph.remove_vertex 2
-let _ = print_delta_in x
-let _ = print_delta_out x
+  let _ = print_delta_in x
+  let _ = print_delta_out x*)
 
 (*
 let list = [(1,2);(1,3);(1,4);(1,5);
