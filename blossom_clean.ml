@@ -472,12 +472,93 @@ module Graph = struct
       Some (src::vertices)
 end
 
+module Dijkstra = struct
+  (* Thanks to https://rosettacode.org/wiki/Dijkstra%27s_algorithm#OCaml *)
+
+  let list_vertices graph =
+    List.fold_left (fun acc ((a, b), _) ->
+        let acc = if List.mem b acc then acc else b::acc in
+        let acc = if List.mem a acc then acc else a::acc in
+        acc
+      ) [] graph
+
+  let neighbors v =
+    List.fold_left (fun acc ((a, b), d) ->
+        if a = v then (b, d)::acc else acc
+      ) []
+
+  let remove_from v lst =
+    let rec aux acc = function [] -> failwith "remove_from"
+                             | x::xs -> if x = v then List.rev_append acc xs else aux (x::acc) xs
+    in aux [] lst
+
+  let with_smallest_distance q dist =
+    match q with
+    | [] -> assert false
+    | x::xs ->
+      let rec aux distance v = function
+        | x::xs ->
+          let d = Hashtbl.find dist x in
+          if d < distance
+          then aux d x xs
+          else aux distance v xs
+        | [] -> (v, distance)
+      in
+      aux (Hashtbl.find dist x) x xs
+
+  let dijkstra max_val zero add graph source target =
+    let vertices = list_vertices graph in
+    let dist_between u v =
+      try List.assoc (u, v) graph
+      with _ -> zero
+    in
+    let dist = Hashtbl.create 1 in
+    let previous = Hashtbl.create 1 in
+    List.iter (fun v ->                  (* initializations *)
+        Hashtbl.add dist v max_val         (* unknown distance function from source to v *)
+      ) vertices;
+    Hashtbl.replace dist source zero;    (* distance from source to source *)
+    let rec loop = function
+      | [] -> ()
+      | q ->
+        let u, dist_u =
+          with_smallest_distance q dist in   (* vertex in q with smallest distance in dist *)
+        if dist_u = max_val then
+          failwith "vertices inaccessible";  (* all remaining vertices are inaccessible from source *)
+        if u = target then () else begin
+          let q = remove_from u q in
+          List.iter (fun (v, d) ->
+              if List.mem v q then begin
+                let alt = add dist_u (dist_between u v) in
+                let dist_v = Hashtbl.find dist v in
+                if alt < dist_v then begin       (* relax (u,v,a) *)
+                  Hashtbl.replace dist v alt;
+                  Hashtbl.replace previous v u;  (* previous node in optimal path from source *)
+                end
+              end
+            ) (neighbors u graph);
+          loop q
+        end
+    in
+    loop vertices;
+    let s = ref [] in
+    let u = ref target in
+    while Hashtbl.mem previous !u do
+      s := !u :: !s;
+      u := Hashtbl.find previous !u
+    done;
+    (source :: !s)
+
+  let dijkstra_int = dijkstra max_int 0 (+)
+
+end
+
 module Tree = struct
 
   (* Arbitrary tree *)
 
-  type value = Graph.vertex
-  type t = Node of (value * t list)
+  type t =
+    | Node of (Graph.Vertex.t * t list)
 
   (* Getters *)
 
@@ -529,6 +610,22 @@ module Tree = struct
     else
       my_fun (x, y) tree
 
+  let contract vertex tree =
+    let rec my_fun = function Node(node_value, node_childs) ->
+      let new_list = List.fold_left
+          (fun new_list node ->
+             if (value node) = vertex then (childs node)@new_list
+             else (my_fun node)::new_list)
+          [] node_childs
+      in
+      Node(node_value, new_list)
+    in
+    if not (mem vertex tree) then
+      tree
+    else
+      if (value tree) = vertex then tree
+      else my_fun tree
+
   let remove vertex tree =
     let rec my_fun = function
       | Node(node_value, node_childs) ->
@@ -543,8 +640,17 @@ module Tree = struct
     if not (mem vertex tree) then
       tree
     else
-      my_fun tree
+      if (value tree) = vertex then failwith "Cannot remove root from tree"
+      else my_fun tree
 
+  let anti_arc (x,y) = (y,x)
+  let anti_arcs = List.map anti_arc
+  let anti_arcs_eset eset = Graph.ESet.of_list (anti_arcs (Graph.ESet.elements eset))
+
+  let unoriented_arcs_eset eset =
+    Graph.ESet.union eset (anti_arcs_eset eset)
+  let unoriented_arcs lst =
+    Graph.ESet.elements (unoriented_arcs_eset (Graph.ESet.of_list lst))
 
   let find_vertices vertices tree =
     List.fold_left (fun accu vertex -> (unsafe_find vertex tree)::accu) [] vertices
@@ -575,7 +681,13 @@ module Tree = struct
         []
         node_childs
 
-  let path_to vertex =
+  let path_from_to src dst tree =
+    let graph = List.map (fun elt -> (elt, 1)) (unoriented_arcs (arcs tree)) in
+    Dijkstra.dijkstra_int graph src dst
+  let path_to dst tree =
+    path_from_to (value tree) dst tree
+
+  let old_path_to vertex =
     let rec my_fun accu = function
       | Node(node_value, node_childs) ->
         if node_value = vertex then node_value::accu
@@ -589,11 +701,11 @@ module Tree = struct
     in
     my_fun []
 
-  let path_from_to src dst tree =
+  let old_path_from_to src dst tree =
     match find src tree with
-    | None -> None
-    | Some(node) -> let a = path_to dst node in
-      if a = [] then None else Some(path_to dst node)
+    | None -> []
+    | Some(node) -> let a = old_path_to dst node in
+      if a = [] then [] else path_to dst node
 
   (* Getters with parity *)
 
@@ -904,20 +1016,26 @@ module BlossomAlgo = struct
   open Print
   open Conversion
   open MoreGraph
+
+  let anti_arc (x,y) = (y,x)
+  let anti_arcs = List.map anti_arc
+  let anti_arcs_eset eset = ESet.of_list (anti_arcs (ESet.elements eset))
+  let unoriented_arcs_eset eset =
+    ESet.union eset (anti_arcs_eset eset)
+  let unoriented_arcs lst =
+    ESet.elements (unoriented_arcs_eset (ESet.of_list lst))
+
   (* blossom management *)
 
   let find_blossom edge tree =
-    match Tree.path_from_to (fst edge) (snd edge) tree with
-    | Some (lst) -> lst
-    | None ->
-      match Tree.path_from_to (snd edge) (fst edge) tree with
-      | Some (lst) -> lst
-      | None -> []
+    let blossom = Tree.path_from_to (fst edge) (snd edge) tree in
+    if blossom <> [] then blossom else
+      Tree.path_from_to (snd edge) (fst edge) tree
 
   let find_new_vertex_name graph =
     (Graph.fold_vertices ~f:(fun x y -> if (x > y) then x else y) graph (-999999)) + 1
 
-  let contract_blossom_in_graph blossom graph =
+  let contract_blossom_in_graph blossom graph meta_vertex=
     let extract f =
       List.fold_left
         (fun accu vertex -> ESet.union (f vertex graph) accu)
@@ -935,7 +1053,6 @@ module BlossomAlgo = struct
         arcs
         ESet.empty
     in
-    let meta_vertex = find_new_vertex_name graph in
     let meta_in_arcs =
       update_arcs (extract Graph.delta_in) meta_vertex in
     let meta_out_arcs =
@@ -956,7 +1073,7 @@ module BlossomAlgo = struct
       (ESet.remove (meta_vertex, meta_vertex) arcs)
       cleaned_graph
 
-  let rec remove_blossom_from_tree (x, y) tree =
+  let rec remove_blossom_from_tree (x, y) tree meta_vertex=
     let contract_blossom x y tree =
       match Tree.find y tree with
       | Some(path) ->
@@ -980,17 +1097,21 @@ module BlossomAlgo = struct
         (Printf.printf "Found %d\n" v ;
          contract_blossom y x tree)
       else
-        Tree.Node(v, List.map (fun node ->  remove_blossom_from_tree (x, y) node) childs)
+        Tree.Node(
+          v, List.map (fun node ->
+              remove_blossom_from_tree (x, y) node meta_vertex) childs)
 
-  let anti_arc (x,y) = (y,x)
-  let anti_arcs = List.map anti_arc
-  let anti_arcs_eset eset = ESet.of_list (anti_arcs (ESet.elements eset))
-
-  let unoriented_arcs_eset eset =
-    ESet.union eset (anti_arcs_eset eset)
-  let unoriented_arcs lst =
-    ESet.elements (unoriented_arcs_eset (ESet.of_list lst))
-
+  let rec contract_blossom blossom tree new_vertex =
+    let rec update_childs = function
+      | [] -> []
+      | head::tail ->
+        if List.mem (Tree.value head) blossom
+        then (Tree.childs head)@(update_childs tail)
+        else head::(update_childs tail)
+    in
+    match tree with
+    | Tree.Node(value, []) as node -> node
+    | Tree.Node(value, childs) -> Tree.Node(value, update_childs childs)
 
   let add_path_to_couplage couplage tree last =
     Printf.printf "\n";
@@ -1031,9 +1152,10 @@ avec x pair & y et z nApp tree & (x,y) nApp couplage & (y,z) app couplage\n";
 avec x et y pair & (x,y) nApp tree\n";
     match Cases.case_c graph couplage tree with
     | Some (edge)->
+      let meta_vertex = find_new_vertex_name graph in
       let blossom = find_blossom edge tree in
-      let contracted_graph = contract_blossom_in_graph blossom graph in
-      let contracted_tree = remove_blossom_from_tree edge tree in
+      let contracted_graph = contract_blossom_in_graph blossom graph meta_vertex in
+      let contracted_tree = remove_blossom_from_tree edge tree meta_vertex in
       Printf.printf "blossom : "; print_int_list blossom; Printf.printf "\n";
       Print.print_delta_out graph; Printf.printf "\n";
       Print.print_delta_out contracted_graph; Printf.printf "\n";
@@ -1094,7 +1216,32 @@ avec x et y pair & (x,y) nApp tree\n";
     |> blossom_algorithm 10
 end
 
-let graph_list = [(1,8);(1,2);(1,5);
+let my_tree_list =
+  [(1,2);(1,3);(1,4);
+   (2,5);(2,6);(2,7);
+   (3,8);(3,9);(3,10);
+   (4,11);(4,12);(4,13);
+   (5,14);(5,15);(5,16);
+   (6,17);(6,18);(6,19);
+   (7,20);(7,21);(7,22);
+   (8,23);(8,24);(8,25);
+   (9,26);(9,27);(9,28)]
+
+let my_tree = Tree.of_arcs my_tree_list
+
+let _ = Tree.contract 4 my_tree
+let _ = BlossomAlgo.find_blossom (6,12) my_tree
+let _ = BlossomAlgo.remove_blossom_from_tree (12,6) my_tree 23
+
+let _ = Print.print_tree my_tree
+let _ = Print.print_tree (
+    List.fold_left (fun accu vertex -> Tree.contract vertex accu) my_tree [13;4;12]
+)
+
+(* pour contracter l'arbre il faut tout contracter
+sauf le noeud le moins profond qui devient le meta_vertex *)
+
+(*let graph_list = [(1,8);(1,2);(1,5);
                   (2,1);(2,8);(2,3);
                   (3,5);(3,10);(3,2);(3,9);(3,6);
                   (4,5);(4,7);(4,6);
@@ -1107,11 +1254,14 @@ let graph_list = [(1,8);(1,2);(1,5);
 let couplage_list = [(1,8);(2,3);(6,9)]
 let tree_list = [(5,7);(7,4);(5,6);(7,8)]
 
+let a = List.map (fun elt -> (elt, 1)) tree_list
+
+
 let graph = Conversion.graph_of_list graph_list
 let couplage = Conversion.eset_of_list couplage_list
 let tree = Conversion.tree_of_list tree_list
 
-let _ = BlossomAlgo.do_blossom graph
+let _ = BlossomAlgo.do_blossom graph*)
 
 let _ = ()
 
