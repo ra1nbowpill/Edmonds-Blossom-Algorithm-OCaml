@@ -568,6 +568,16 @@ module Tree = struct
 
   (* Tree management *)
 
+  let depth_of vertex =
+    let rec my_fun depth =
+      function
+      | Node(value, []) -> if value = vertex then 1 + depth else -1
+      | Node(value, childs) ->
+        if value = vertex then 1 + depth
+        else List.fold_left (fun accu node -> max accu (my_fun (depth+1) node)) (-1) childs
+    in
+    my_fun (-1)
+
   let rec depth = function
     | Node(v, childs) ->
       1 + List.fold_left (fun accu node -> max accu (depth node)) (-1) childs
@@ -623,8 +633,8 @@ module Tree = struct
     if not (mem vertex tree) then
       tree
     else
-      if (value tree) = vertex then tree
-      else my_fun tree
+    if (value tree) = vertex then tree
+    else my_fun tree
 
   let remove vertex tree =
     let rec my_fun = function
@@ -640,8 +650,8 @@ module Tree = struct
     if not (mem vertex tree) then
       tree
     else
-      if (value tree) = vertex then failwith "Cannot remove root from tree"
-      else my_fun tree
+    if (value tree) = vertex then failwith "Cannot remove root from tree"
+    else my_fun tree
 
   let anti_arc (x,y) = (y,x)
   let anti_arcs = List.map anti_arc
@@ -938,13 +948,14 @@ module Cases = struct
              accu)
         ESet.empty even_v
     in
+    let choose = ESet.choose in
+    print_eset solutions;Printf.printf "\n";
     let chosen =
       if ESet.is_empty solutions then None
       else
-        let sol = ESet.choose solutions in
-        (print_arc sol; Printf.printf "\n"; Some(ESet.choose solutions))
+        (print_arc (choose solutions); Printf.printf "\n";
+         Some(choose solutions))
     in
-    print_eset solutions;Printf.printf "\n";
     chosen
 
   let case_b graph couplage tree =
@@ -975,14 +986,15 @@ module Cases = struct
                           (for_each_y (VSet.elements (compute_ys x))) )) xs
     in
     let solutions = for_each_x even_v in
+    let choose = List.hd in
+    print_list (fun (x,y,z) -> Printf.printf "(%d,%d,%d)" x y z) solutions;
+    Printf.printf "\n";
     let chosen =
       if solutions = [] then None
       else
-        let (x,y,z) as sol = List.hd solutions in
+        let (x,y,z) as sol = choose solutions in
         Printf.printf "(%d,%d,%d)" x y z; Some(sol)
     in
-    print_list (fun (x,y,z) -> Printf.printf "(%d,%d,%d)" x y z) solutions;
-    Printf.printf "\n";
     chosen
 
   let case_c graph couplage tree =
@@ -1000,13 +1012,14 @@ module Cases = struct
              (VSet.elements (neighboors_in_tree_edge_not_in vertex)))@accu)
         [] even_v
     in
+    let choose = List.hd in
+    print_arc_list solutions; Printf.printf "\n";
     let chosen =
       if solutions = [] then None
       else
-        let sol = List.hd solutions in
+        let sol = choose solutions in
         print_arc sol; Printf.printf "\n"; Some(sol)
     in
-    print_arc_list solutions; Printf.printf "\n";
     chosen
 end
 
@@ -1035,7 +1048,7 @@ module BlossomAlgo = struct
   let find_new_vertex_name graph =
     (Graph.fold_vertices ~f:(fun x y -> if (x > y) then x else y) graph (-999999)) + 1
 
-  let contract_blossom_in_graph blossom graph meta_vertex=
+  let contract_graph blossom graph meta_vertex=
     let extract f =
       List.fold_left
         (fun accu vertex -> ESet.union (f vertex graph) accu)
@@ -1073,50 +1086,49 @@ module BlossomAlgo = struct
       (ESet.remove (meta_vertex, meta_vertex) arcs)
       cleaned_graph
 
-  let rec remove_blossom_from_tree (x, y) tree meta_vertex=
-    let contract_blossom x y tree =
-      match Tree.find y tree with
-      | Some(path) ->
-        Printf.printf "Found %d\n" y; path
-      | None ->
-        Printf.printf "remove_blossom_from_tree error : path\
-                       from %d to %d does not exist in the tree.\n" x y;
-        Tree.Node(0, [])
+  let min_depth_vertex lst tree =
+    let solution =
+      List.fold_left
+        (fun a b -> if (snd a) < (snd b) then a else b) (-1,99999999)
+        (List.map (fun elt -> (elt, Tree.depth_of elt tree)) lst)
     in
-    match tree with
-    | Tree.Node(v, []) as node ->
-      if (v == x || v == y) then
-        Printf.printf "remove_blossom_from_tree error : blossom\
-                       begins at a leaf of the tree.\n";
-      node
-    | Tree.Node(v, childs) ->
-      if v == x  then
-        (Printf.printf "Found %d\n" v ;
-         contract_blossom x y tree)
-      else if v == y  then
-        (Printf.printf "Found %d\n" v ;
-         contract_blossom y x tree)
-      else
-        Tree.Node(
-          v, List.map (fun node ->
-              remove_blossom_from_tree (x, y) node meta_vertex) childs)
+    fst solution
 
-  let rec contract_blossom blossom tree new_vertex =
-    let rec update_childs = function
-      | [] -> []
-      | head::tail ->
-        if List.mem (Tree.value head) blossom
-        then (Tree.childs head)@(update_childs tail)
-        else head::(update_childs tail)
+  let remove_min_depth_vertex_from_blossom blossom tree =
+    List.filter (fun elt -> elt <> (min_depth_vertex blossom tree)) blossom
+
+  let to_contract blossom tree =
+    remove_min_depth_vertex_from_blossom blossom tree
+
+  let contract to_contract tree =
+    List.fold_left
+      (fun accu vertex -> Tree.contract vertex accu) tree to_contract
+
+  let rename old_vertex new_vertex tree =
+    let rec my_fun = function
+      | Tree.Node(node_value, node_childs) ->
+        if old_vertex == node_value then Tree.Node(new_vertex, node_childs)
+        else Tree.Node(node_value, List.map (fun node -> my_fun node) node_childs)
     in
-    match tree with
-    | Tree.Node(value, []) as node -> node
-    | Tree.Node(value, childs) -> Tree.Node(value, update_childs childs)
+    if not (Tree.mem old_vertex tree) then
+      tree
+    else
+      my_fun tree
+
+  let contract_tree meta_vertex blossom tree=
+    rename
+      (min_depth_vertex blossom tree)
+      meta_vertex (contract (to_contract blossom tree) tree)
+
+  let contract_couplage meta_vertex blossom couplage =
+    let update_vertex v = if List.mem v blossom then meta_vertex else v in
+    let updated_couplage =
+      ESet.fold (fun (x, y) accu -> ESet.add (update_vertex x, update_vertex y) accu)
+      ESet.empty couplage
+    in
+    ESet.filter (fun (x, y) -> x <> y) updated_couplage
 
   let add_path_to_couplage couplage tree last =
-    Printf.printf "\n";
-    print_arc_list (Tree.even_arcs_to last tree); Printf.printf "\n";
-    print_arc_list (Tree.uneven_arcs_to last tree); Printf.printf "\n";
     ESet.union
       (ESet.of_list (Tree.even_arcs_to last tree))
       (ESet.diff
@@ -1154,14 +1166,26 @@ avec x et y pair & (x,y) nApp tree\n";
     | Some (edge)->
       let meta_vertex = find_new_vertex_name graph in
       let blossom = find_blossom edge tree in
-      let contracted_graph = contract_blossom_in_graph blossom graph meta_vertex in
-      let contracted_tree = remove_blossom_from_tree edge tree meta_vertex in
+      let contracted_graph = contract_graph blossom graph meta_vertex in
+      let contracted_tree = contract_tree meta_vertex blossom tree in
+      let contracted_couplage = contract_couplage meta_vertex blossom couplage in
       Printf.printf "blossom : "; print_int_list blossom; Printf.printf "\n";
       Print.print_delta_out graph; Printf.printf "\n";
       Print.print_delta_out contracted_graph; Printf.printf "\n";
       Print.print_tree tree; Printf.printf "\n";
       Print.print_tree contracted_tree; Printf.printf "\n";
-      test_case_a contracted_graph couplage contracted_tree
+      let (new_contracted_graph, new_couplage) =
+        test_case_a contracted_graph contracted_couplage contracted_tree
+      in
+      Printf.printf "Graph :\n"; Print.print_delta_out graph;
+      Printf.printf "Contracted_graph :\n"; Print.print_delta_out new_contracted_graph;
+      Printf.printf "New couplage :\n"; Print.print_eset new_couplage; Printf.printf "\n";
+      (* uncontract the graph -> return original graph *)
+      (* update new_couplage to match original graph *)
+      (* -> vertex that appears 2 time in the couplage, *)
+      (* and "turn" the couplage along the blossom *)
+      (graph, new_couplage)
+
     | None ->
       test_case_d graph couplage tree
 
@@ -1216,7 +1240,24 @@ avec x et y pair & (x,y) nApp tree\n";
     |> blossom_algorithm 10
 end
 
-let my_tree_list =
+let graph_list = [(1,8);(1,2);(1,5); (2,1);(2,8);(2,3);
+                  (3,5);(3,10);(3,2);(3,9);(3,6); (4,5);(4,7);(4,6);
+                  (5,1);(5,3);(5,4);(5,7); (6,4);(6,7);(6,9);(6,3);
+                  (7,5);(7,4);(7,6); (8,1);(8,2); (9,3);(9,6); (10,3)]
+let couplage_list = [(1,8);(2,3);(6,9)]
+let tree_list = [(5,7);(7,4);(5,6);(7,8)]
+
+
+let graph = Conversion.graph_of_list graph_list
+let couplage = Conversion.eset_of_list couplage_list
+let tree = Conversion.tree_of_list tree_list
+
+let _ = BlossomAlgo.do_blossom graph
+
+let _ = ()
+
+
+(*let my_tree_list =
   [(1,2);(1,3);(1,4);
    (2,5);(2,6);(2,7);
    (3,8);(3,9);(3,10);
@@ -1227,43 +1268,9 @@ let my_tree_list =
    (8,23);(8,24);(8,25);
    (9,26);(9,27);(9,28)]
 
-let my_tree = Tree.of_arcs my_tree_list
+  let my_tree = Tree.of_arcs my_tree_list
+  let my_blossom = [13;4;12]*)
 
-let _ = Tree.contract 4 my_tree
-let _ = BlossomAlgo.find_blossom (6,12) my_tree
-let _ = BlossomAlgo.remove_blossom_from_tree (12,6) my_tree 23
-
-let _ = Print.print_tree my_tree
-let _ = Print.print_tree (
-    List.fold_left (fun accu vertex -> Tree.contract vertex accu) my_tree [13;4;12]
-)
-
-(* pour contracter l'arbre il faut tout contracter
-sauf le noeud le moins profond qui devient le meta_vertex *)
-
-(*let graph_list = [(1,8);(1,2);(1,5);
-                  (2,1);(2,8);(2,3);
-                  (3,5);(3,10);(3,2);(3,9);(3,6);
-                  (4,5);(4,7);(4,6);
-                  (5,1);(5,3);(5,4);(5,7);
-                  (6,4);(6,7);(6,9);(6,3);
-                  (7,5);(7,4);(7,6);
-                  (8,1);(8,2);
-                  (9,3);(9,6);
-                  (10,3)]
-let couplage_list = [(1,8);(2,3);(6,9)]
-let tree_list = [(5,7);(7,4);(5,6);(7,8)]
-
-let a = List.map (fun elt -> (elt, 1)) tree_list
-
-
-let graph = Conversion.graph_of_list graph_list
-let couplage = Conversion.eset_of_list couplage_list
-let tree = Conversion.tree_of_list tree_list
-
-let _ = BlossomAlgo.do_blossom graph*)
-
-let _ = ()
 
 (*let _ = VSet.elements (saturated_vertices couplage)             (* 1,2,3,6,8,9 *)
   let _ = VSet.elements (unsaturated_vertices graph couplage)     (* 4,5,7,10 *)
