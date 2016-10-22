@@ -1135,6 +1135,15 @@ module BlossomAlgo = struct
          couplage
          (ESet.of_list (unoriented_arcs (Tree.uneven_arcs_to last tree))))
 
+
+  let init_node graph couplage x =
+    let solutions = unsaturated_vertices graph couplage in
+    let chosen =
+      if x = 10 then 5
+      else VSet.choose solutions
+    in
+    Tree.Node(chosen, [])
+
   (* Actions for cases *)
 
   let rec test_case_a graph couplage tree =
@@ -1178,9 +1187,26 @@ avec x et y pair & (x,y) nApp tree\n";
       let (new_contracted_graph, new_couplage) =
         test_case_a contracted_graph contracted_couplage contracted_tree
       in
-      (*Printf.printf "Graph :\n"; Print.print_delta_out graph;
-      Printf.printf "Contracted_graph :\n"; Print.print_delta_out new_contracted_graph;
-      Printf.printf "New couplage :\n"; Print.print_eset new_couplage; Printf.printf "\n";*)
+      let update_arc (x,y) =
+        let a y =
+          VSet.choose (VSet.inter
+                         (ESet.fold
+                            (fun arc accu -> VSet.add (fst arc) accu)
+                            (Graph.delta_in y graph) VSet.empty)
+                         (VSet.of_list blossom))
+        in
+        if x = meta_vertex then
+          (a y, y)
+        else if y = meta_vertex then
+          (Printf.printf "updating_arcs for matching original graph and there is an arc (X, meta_vertex) and I am not sure whether this is possible or what to do ?!?!?!?!";
+          (x, a x))
+        else
+          (x,y)
+      in
+      let updated_new_couplage =
+        ESet.fold (fun arc accu -> ESet.add (update_arc arc) accu)
+          new_couplage ESet.empty
+      in
 
       (* uncontract the graph -> return original graph *)
       (* update new_couplage to match original graph ->
@@ -1189,7 +1215,14 @@ avec x et y pair & (x,y) nApp tree\n";
       (* find the best couplage for the original graph with the new_couplage *)
       (* the return value should be (graph, updated_new_couplage)
          but in order for the algo to finish with actual implementation we return this :*)
-      (new_contracted_graph, new_couplage)
+      let (new_new_contracted_graph, new_updated_new_couplage) =
+        blossom_algorithm 9 (graph, updated_new_couplage)
+      in
+      Printf.printf "Graph :\n"; Print.print_delta_out graph;
+      Printf.printf "Contracted_graph :\n"; Print.print_delta_out new_new_contracted_graph;
+      Printf.printf "New couplage :\n"; Print.print_eset new_updated_new_couplage; Printf.printf "\n";
+      (*(new_contracted_graph, new_couplage)*)
+      (graph, new_updated_new_couplage)
 
     | None ->
       test_case_d graph couplage tree
@@ -1200,15 +1233,7 @@ avec x et y pair & (x,y) nApp tree\n";
 
   (* Blossom algorithm *)
 
-  let init_node graph couplage x =
-    let solutions = unsaturated_vertices graph couplage in
-    let chosen =
-      if x = 10 then 5
-      else VSet.choose solutions
-    in
-    Tree.Node(chosen, [])
-
-  let rec blossom_algorithm x (graph, couplage) =
+  and blossom_algorithm x (graph, couplage) =
     Printf.printf "\n%d\n" x;
     if x == 0 then
       (graph, couplage)
