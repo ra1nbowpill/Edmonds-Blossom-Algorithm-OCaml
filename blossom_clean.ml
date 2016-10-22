@@ -765,7 +765,7 @@ module Tree = struct
     | [elt] -> []
     | elt1::elt2::next ->
       if parite then
-        (elt2, elt1)::p_arcs_of_path (not parite) (elt2::next)
+        (elt1, elt2)::p_arcs_of_path (not parite) (elt2::next)
       else
         p_arcs_of_path (not parite) (elt2::next)
 
@@ -1124,7 +1124,7 @@ module BlossomAlgo = struct
     let update_vertex v = if List.mem v blossom then meta_vertex else v in
     let updated_couplage =
       ESet.fold (fun (x, y) accu -> ESet.add (update_vertex x, update_vertex y) accu)
-      ESet.empty couplage
+      couplage ESet.empty
     in
     ESet.filter (fun (x, y) -> x <> y) updated_couplage
 
@@ -1138,6 +1138,8 @@ module BlossomAlgo = struct
   (* Actions for cases *)
 
   let rec test_case_a graph couplage tree =
+    Printf.printf "\n";
+    Printf.printf "Couplage : "; print_eset couplage; Printf.printf "\n";
     Printf.printf "Tree : "; print_tree tree; Printf.printf "\n";
     Printf.printf "Cas A : On cherche (x,y)
 avec x pair & x et y nApp (couplage U tree)\n";
@@ -1170,21 +1172,24 @@ avec x et y pair & (x,y) nApp tree\n";
       let contracted_tree = contract_tree meta_vertex blossom tree in
       let contracted_couplage = contract_couplage meta_vertex blossom couplage in
       Printf.printf "blossom : "; print_int_list blossom; Printf.printf "\n";
-      Print.print_delta_out graph; Printf.printf "\n";
       Print.print_delta_out contracted_graph; Printf.printf "\n";
-      Print.print_tree tree; Printf.printf "\n";
       Print.print_tree contracted_tree; Printf.printf "\n";
+      Print.print_eset contracted_couplage; Printf.printf "\n";
       let (new_contracted_graph, new_couplage) =
         test_case_a contracted_graph contracted_couplage contracted_tree
       in
-      Printf.printf "Graph :\n"; Print.print_delta_out graph;
+      (*Printf.printf "Graph :\n"; Print.print_delta_out graph;
       Printf.printf "Contracted_graph :\n"; Print.print_delta_out new_contracted_graph;
-      Printf.printf "New couplage :\n"; Print.print_eset new_couplage; Printf.printf "\n";
+      Printf.printf "New couplage :\n"; Print.print_eset new_couplage; Printf.printf "\n";*)
+
       (* uncontract the graph -> return original graph *)
-      (* update new_couplage to match original graph *)
-      (* -> vertex that appears 2 time in the couplage, *)
-      (* and "turn" the couplage along the blossom *)
-      (graph, new_couplage)
+      (* update new_couplage to match original graph ->
+         put new_couplage in original graph, and obvi translating [meta_vertex, X] to
+         [neighbour_in_blossom_of X, X] *)
+      (* find the best couplage for the original graph with the new_couplage *)
+      (* the return value should be (graph, updated_new_couplage)
+         but in order for the algo to finish with actual implementation we return this :*)
+      (new_contracted_graph, new_couplage)
 
     | None ->
       test_case_d graph couplage tree
@@ -1216,7 +1221,7 @@ avec x et y pair & (x,y) nApp tree\n";
         print_eset couplage;
       Printf.printf "\n";
       Printf.printf "Nombre de sommets insaturés : %d\n" nb_insature ;
-      if nb_insature >= 1 then
+      if nb_insature >= 2 then
         begin
           Printf.printf "On construit un arbre\n" ;
           test_case_a graph couplage (init_node graph couplage x)
@@ -1244,13 +1249,8 @@ let graph_list = [(1,8);(1,2);(1,5); (2,1);(2,8);(2,3);
                   (3,5);(3,10);(3,2);(3,9);(3,6); (4,5);(4,7);(4,6);
                   (5,1);(5,3);(5,4);(5,7); (6,4);(6,7);(6,9);(6,3);
                   (7,5);(7,4);(7,6); (8,1);(8,2); (9,3);(9,6); (10,3)]
-let couplage_list = [(1,8);(2,3);(6,9)]
-let tree_list = [(5,7);(7,4);(5,6);(7,8)]
-
 
 let graph = Conversion.graph_of_list graph_list
-let couplage = Conversion.eset_of_list couplage_list
-let tree = Conversion.tree_of_list tree_list
 
 let _ = BlossomAlgo.do_blossom graph
 
