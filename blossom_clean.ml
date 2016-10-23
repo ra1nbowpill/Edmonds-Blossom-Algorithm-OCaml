@@ -1136,11 +1136,10 @@ module BlossomAlgo = struct
          (ESet.of_list (unoriented_arcs (Tree.uneven_arcs_to last tree))))
 
 
-  let init_node graph couplage x =
+  let init_node graph couplage =
     let solutions = unsaturated_vertices graph couplage in
     let chosen =
-      if x = 10 then 5
-      else VSet.choose solutions
+      VSet.choose solutions
     in
     Tree.Node(chosen, [])
 
@@ -1170,6 +1169,35 @@ avec x pair & y et z nApp tree & (x,y) nApp couplage & (y,z) app couplage\n";
     | None ->
       test_case_c graph couplage tree
 
+  and update_couplage meta_vertex blossom graph couplage =
+      let update_arc (x,y) =
+        let a y =
+          (VSet.inter
+             (ESet.fold
+                (fun arc accu -> VSet.add (fst arc) accu)
+                (Graph.delta_in y graph) VSet.empty)
+             (VSet.of_list blossom))
+        in
+        if x = meta_vertex then
+          (VSet.choose (a y), y)
+        else if y = meta_vertex then
+          (Printf.printf "updating_arcs for matching original graph and there is an arc (X, meta_vertex) and I am not sure whether this is possible or what to do ?!?!?!?!";
+          (x, VSet.choose(a x)))
+        else
+          (x,y)
+      in
+      let updated_couplage =
+        ESet.fold (fun arc accu -> ESet.add (update_arc arc) accu)
+          couplage ESet.empty
+      in
+      let (new_new_contracted_graph, new_updated_couplage) =
+        blossom_algorithm (graph, updated_couplage)
+      in
+      Printf.printf "Graph :\n"; Print.print_delta_out graph;
+      Printf.printf "Contracted_graph :\n"; Print.print_delta_out new_new_contracted_graph;
+      Printf.printf "New couplage :\n"; Print.print_eset new_updated_couplage; Printf.printf "\n";
+      (new_new_contracted_graph, new_updated_couplage)
+
   and test_case_c graph couplage tree =
     Printf.printf "Cas C : on cherche (x, y)
 avec x et y pair & (x,y) nApp tree\n";
@@ -1184,46 +1212,10 @@ avec x et y pair & (x,y) nApp tree\n";
       Print.print_delta_out contracted_graph; Printf.printf "\n";
       Print.print_tree contracted_tree; Printf.printf "\n";
       Print.print_eset contracted_couplage; Printf.printf "\n";
-      let (new_contracted_graph, new_couplage) =
+      let (_, new_couplage) =
         test_case_a contracted_graph contracted_couplage contracted_tree
       in
-      let update_arc (x,y) =
-        let a y =
-          VSet.choose (VSet.inter
-                         (ESet.fold
-                            (fun arc accu -> VSet.add (fst arc) accu)
-                            (Graph.delta_in y graph) VSet.empty)
-                         (VSet.of_list blossom))
-        in
-        if x = meta_vertex then
-          (a y, y)
-        else if y = meta_vertex then
-          (Printf.printf "updating_arcs for matching original graph and there is an arc (X, meta_vertex) and I am not sure whether this is possible or what to do ?!?!?!?!";
-          (x, a x))
-        else
-          (x,y)
-      in
-      let updated_new_couplage =
-        ESet.fold (fun arc accu -> ESet.add (update_arc arc) accu)
-          new_couplage ESet.empty
-      in
-
-      (* uncontract the graph -> return original graph *)
-      (* update new_couplage to match original graph ->
-         put new_couplage in original graph, and obvi translating [meta_vertex, X] to
-         [neighbour_in_blossom_of X, X] *)
-      (* find the best couplage for the original graph with the new_couplage *)
-      (* the return value should be (graph, updated_new_couplage)
-         but in order for the algo to finish with actual implementation we return this :*)
-      let (new_new_contracted_graph, new_updated_new_couplage) =
-        blossom_algorithm 9 (graph, updated_new_couplage)
-      in
-      Printf.printf "Graph :\n"; Print.print_delta_out graph;
-      Printf.printf "Contracted_graph :\n"; Print.print_delta_out new_new_contracted_graph;
-      Printf.printf "New couplage :\n"; Print.print_eset new_updated_new_couplage; Printf.printf "\n";
-      (*(new_contracted_graph, new_couplage)*)
-      (graph, new_updated_new_couplage)
-
+      update_couplage meta_vertex blossom graph new_couplage
     | None ->
       test_case_d graph couplage tree
 
@@ -1233,30 +1225,26 @@ avec x et y pair & (x,y) nApp tree\n";
 
   (* Blossom algorithm *)
 
-  and blossom_algorithm x (graph, couplage) =
-    Printf.printf "\n%d\n" x;
-    if x == 0 then
-      (graph, couplage)
+  and blossom_algorithm (graph, couplage) =
+    let nb_insature = VSet.cardinal (unsaturated_vertices graph couplage) in
+    Printf.printf "Couplage actuel : ";
+    if ESet.is_empty couplage then
+      Printf.printf "[]"
     else
-      let nb_insature = VSet.cardinal (unsaturated_vertices graph couplage) in
-      Printf.printf "Couplage actuel : ";
-      if ESet.is_empty couplage then
-        Printf.printf "[]"
-      else
-        print_eset couplage;
-      Printf.printf "\n";
-      Printf.printf "Nombre de sommets insaturés : %d\n" nb_insature ;
-      if nb_insature >= 2 then
-        begin
-          Printf.printf "On construit un arbre\n" ;
-          test_case_a graph couplage (init_node graph couplage x)
-          |> blossom_algorithm (x - 1)
-        end
-      else
-        begin
-          Printf.printf "Plus assez de sommets insaturés\n";
-          (graph, couplage)
-        end
+      print_eset couplage;
+    Printf.printf "\n";
+    Printf.printf "Nombre de sommets insaturés : %d\n" nb_insature ;
+    if nb_insature >= 2 then
+      begin
+        Printf.printf "On construit un arbre\n" ;
+        test_case_a graph couplage (init_node graph couplage)
+        |> blossom_algorithm
+      end
+    else
+      begin
+        Printf.printf "Plus assez de sommets insaturés\n";
+        (graph, couplage)
+      end
 
   (* Initialise l'algorithme *)
   let init_algorithm graph =
@@ -1267,13 +1255,22 @@ avec x et y pair & (x,y) nApp tree\n";
   let do_blossom graph =
     graph
     |> init_algorithm
-    |> blossom_algorithm 10
+    |> blossom_algorithm
 end
 
 let graph_list = [(1,8);(1,2);(1,5); (2,1);(2,8);(2,3);
                   (3,5);(3,10);(3,2);(3,9);(3,6); (4,5);(4,7);(4,6);
                   (5,1);(5,3);(5,4);(5,7); (6,4);(6,7);(6,9);(6,3);
                   (7,5);(7,4);(7,6); (8,1);(8,2); (9,3);(9,6); (10,3)]
+
+let graph_list = [(1,2);(1,3);
+                  (2,1);(2,4);
+                  (3,1);(3,4);(3,5);
+                  (4,2);(4,3);(4,6);(4,7);(4,8);
+                  (5,3);(5,6);
+                  (6,4);(6,5);(6,7);
+                  (7,4);(7,6);
+                  (8,4);]
 
 let graph = Conversion.graph_of_list graph_list
 
