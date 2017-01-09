@@ -493,19 +493,19 @@ let _ = ()
    (8,23);(8,24);(8,25);
    (9,26);(9,27);(9,28)]
 
-  let my_tree = Tree.of_arcs my_tree_list
+  let my_tree = NTree.of_arcs my_tree_list
   let my_blossom = [13;4;12]*)
 
 
 (*let _ = VSet.elements (saturated_vertices couplage)             (* 1,2,3,6,8,9 *)
   let _ = VSet.elements (unsaturated_vertices graph couplage)     (* 4,5,7,10 *)
-  let _ = ESet.elements (Tree.eset tree)                       (* [(5,7);(7,4)] *)
-  let _ = VSet.elements (Tree.vset tree)                       (* 5,7,4,6,8 *)
-  let _ = Tree.even_vertices tree                      (* 5,8,4 *)
-  let _ = Tree.uneven_vertices tree                    (* 6,7 *)
+  let _ = ESet.elements (NTree.eset tree)                       (* [(5,7);(7,4)] *)
+  let _ = VSet.elements (NTree.vset tree)                       (* 5,7,4,6,8 *)
+  let _ = NTree.even_vertices tree                      (* 5,8,4 *)
+  let _ = NTree.uneven_vertices tree                    (* 6,7 *)
 
-  let _ = Tree.even_arcs_to 8 tree
-  let _ = Tree.uneven_arcs_to 8 tree*)
+  let _ = NTree.even_arcs_to 8 tree
+  let _ = NTree.uneven_arcs_to 8 tree*)
 
 (*let blossom_edge = match  case_c graph couplage tree with | Some(edge) -> edge | None -> (0,0)
   let my_blossom = find_blossom blossom_edge tree
@@ -531,7 +531,7 @@ let list = [(1,2);(1,3);(1,4);(1,5);
             (6,22);(6,23);(6,24);(6,25);
             (11,26);(11,27);(11,28)]
 let tree = Tree.of_arcs list
-open Tree
+open NTree
 let _ = value tree (* 1 *)
 let _ = childs tree (* 5 4 3 2 *)
 let _ = find 5 tree (* Node (5, [21, 20, 19, 18]) *)
