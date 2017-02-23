@@ -303,21 +303,17 @@ avec x et y pair & (x,y) nApp tree\n";
   and blossom_algorithm (graph, couplage) =
     let nb_insature = VSet.cardinal (unsaturated_vertices graph couplage) in
     Printf.printf "Couplage actuel : ";
-    if ESet.is_empty couplage then
-      Printf.printf "[]"
-    else
-      print_eset couplage;
-    Printf.printf "\n";
+    print_eset couplage;
     Printf.printf "Nombre de sommets insaturés : %d\n" nb_insature ;
     if nb_insature >= 2 then
       begin
-        Printf.printf "On construit un arbre\n" ;
+        Printf.printf "On construit un arbre :\n" ;
         test_case_a graph couplage (init_node graph couplage)
         |> blossom_algorithm
       end
     else
       begin
-        Printf.printf "Plus assez de sommets insaturés\n";
+        Printf.printf "Plus assez de sommets insaturés\nOn arrete\n";
         (graph, couplage)
       end
 
@@ -333,21 +329,35 @@ avec x et y pair & (x,y) nApp tree\n";
     |> blossom_algorithm
 end
 
-let graph_list = [(1,8);(1,2);(1,5); (2,1);(2,8);(2,3);
-                  (3,5);(3,10);(3,2);(3,9);(3,6); (4,5);(4,7);(4,6);
-                  (5,1);(5,3);(5,4);(5,7); (6,4);(6,7);(6,9);(6,3);
-                  (7,5);(7,4);(7,6); (8,1);(8,2); (9,3);(9,6); (10,3)]
+(* Normal Graph *)
+let graph_list1 = [(1,8);(1,2);(1,5);
+                  (2,1);(2,8);(2,3);
+                  (3,5);(3,10);(3,2);(3,9);(3,6);
+                  (4,5);(4,7);(4,6);
+                  (5,1);(5,3);(5,4);(5,7);
+                  (6,4);(6,7);(6,9);(6,3);
+                  (7,5);(7,4);(7,6);
+                  (8,1);(8,2);
+                  (9,3);(9,6); (10,3)]
 
-let graph_list = [(1,2);(1,3);
+(* Odd number of vertices *)
+let graph_list2 = [(1,2);(1,3);
                   (2,1);(2,4);
                   (3,1);(3,4);(3,5);
-                  (4,2);(4,3);(4,6);(4,7);(4,8);
+                  (4,2);(4,3);(4,6);(4,7);
                   (5,3);(5,6);
                   (6,4);(6,5);(6,7);
-                  (7,4);(7,6);
-                  (8,4);]
+                  (7,4);(7,6)]
 
-let graph = Conversion.graph_of_list graph_list
+(* Graph with a blossom *)
+let graph_list3 = [(1,2);(1,4);
+                   (2,1);(2,3);(2,5);
+                   (3,2);(3,5);
+                   (4,1);
+                   (5,2);(5,3);(5,6);
+                   (6,5)]
+
+let graph = Conversion.graph_of_list graph_list2
 
 let _ = BlossomAlgo.do_blossom graph
 
