@@ -3,8 +3,12 @@ S More
 S Control
 S DataStruct
 S Observer
+S WebUI
 B _build/More
 B _build/Control
 B _build/DataStruct
 B _build/Exec
 B _build/Observer
+B _build/WebUI
+PKG lwt js_of_ocaml js_of_ocaml.syntax
+PKG vg gg vg.htmlc

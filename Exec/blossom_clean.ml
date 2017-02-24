@@ -222,7 +222,6 @@ module BlossomAlgo = struct
 
   let rec test_case_a graph couplage tree =
     Printf.printf "\n";
-    Printf.printf "Couplage : "; print_eset couplage; Printf.printf "\n";
     Printf.printf "Tree : "; print_tree tree; Printf.printf "\n";
     Printf.printf "Cas A : On cherche (x,y)
 avec x pair & x et y nApp (couplage U tree)\n";
@@ -302,7 +301,7 @@ avec x et y pair & (x,y) nApp tree\n";
 
   and blossom_algorithm (graph, couplage) =
     let nb_insature = VSet.cardinal (unsaturated_vertices graph couplage) in
-    Printf.printf "Couplage actuel : ";
+    Printf.printf "\n\nCouplage actuel : ";
     print_eset couplage;
     Printf.printf "Nombre de sommets insaturés : %d\n" nb_insature ;
     if nb_insature >= 2 then
@@ -357,7 +356,7 @@ let graph_list3 = [(1,2);(1,4);
                    (5,2);(5,3);(5,6);
                    (6,5)]
 
-let graph = Conversion.graph_of_list graph_list2
+let graph = Conversion.graph_of_list graph_list3
 
 let _ = BlossomAlgo.do_blossom graph
 
