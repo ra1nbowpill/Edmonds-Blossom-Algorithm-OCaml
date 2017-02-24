@@ -1,5 +1,63 @@
 (* a, b, c, d cases test *)
 
+module Self =
+struct
+  type t = {
+    layout : Graph.vertex -> Gg.p2;
+    graph : Graph.t;         (* Le graphe d'origine *)
+    pairring : Graph.ESet.t;          (* L'arbre couvrant *)
+    tree : NTree.t;
+  }
+
+  let rec mem_couplage vertex set =
+    let rec xx = function
+      | (a, b)::next ->
+        if vertex == a || vertex == b then true
+        else xx next
+      | [] -> false
+    in
+    xx (Graph.ESet.elements set)
+
+  let vertex_properties strct vertex =
+    let open MoreImage in
+    if List.mem vertex (NTree.even_vertices strct.tree) then
+      Properties.([drawing_color (Gg.Color.green)])
+    else if List.mem vertex (NTree.uneven_vertices strct.tree) then
+      Properties.([drawing_color (Gg.Color.blue)])
+    else
+      Properties.([drawing_color (Gg.Color.black)])
+
+  let arc_properties strct ((src, dst) as arc) =
+    let open MoreImage in
+    if Graph.ESet.mem arc strct.pairring
+        || Graph.ESet.mem (snd arc, fst arc) strct.pairring then
+      Properties.([
+          drawing_color (Gg.Color.red);
+          draw_triangle (false);
+        ])
+    else
+      Properties.([
+          draw_triangle (false);
+        ])
+
+
+  let to_image ctxt =
+    MoreImage.draw_graph
+      ~vertex_properties:(vertex_properties ctxt)
+      ~arc_properties:(arc_properties ctxt)
+      ~layout:ctxt.layout
+      ctxt.graph
+end
+
+type t = Self.t
+open Self
+module Show = JsContext.AddDrawable(Self)
+
+let show_blossom_context ctxt =
+  JsContext.compose
+    (Show.show ~width:120 ~height:90 ctxt)
+    (JsContext.end_line)
+
 module Cases = struct
   module VSet = Graph.VSet
   module ESet = Graph.ESet
@@ -220,36 +278,36 @@ module BlossomAlgo = struct
 
   (* Actions for cases *)
 
-  let rec test_case_a graph couplage tree =
+  let rec test_case_a strct =
     Printf.printf "\n";
-    Printf.printf "Tree : "; print_tree tree; Printf.printf "\n";
+    Printf.printf "Tree : "; print_tree strct.tree; Printf.printf "\n";
     Printf.printf "Cas A : On cherche (x,y)
 avec x pair & x et y nApp (couplage U tree)\n";
-    match Cases.case_a graph couplage tree with
+    match Cases.case_a strct.graph strct.pairring strct.tree with
     | Some (edge)->
-      (graph, add_path_to_couplage couplage (NTree.add edge tree) (snd edge))
+      {strct with
+       pairring = add_path_to_couplage strct.pairring
+                    (NTree.add edge strct.tree) (snd edge) }
     | None ->
-      test_case_b graph couplage tree
+      test_case_b strct
 
-  and test_case_b graph couplage tree =
+  and test_case_b strct =
     Printf.printf "Cas B : On cherche (x,y)(y,z)
 avec x pair & y et z nApp tree & (x,y) nApp couplage & (y,z) app couplage\n";
-    match Cases.case_b graph couplage tree with
+    match Cases.case_b strct.graph strct.pairring strct.tree with
     | Some (x, y, z)->
-      test_case_a
-        graph
-        couplage
-        (NTree.add (y, z) (NTree.add (x, y) tree))
+      test_case_a {strct with
+                   tree = NTree.add (y, z) (NTree.add (x, y) strct.tree) }
     | None ->
-      test_case_c graph couplage tree
+      test_case_c strct
 
-  and update_couplage meta_vertex blossom graph couplage =
+  and update_couplage meta_vertex blossom strct =
       let update_arc (x,y) =
         let a y =
           (VSet.inter
              (ESet.fold
                 (fun arc accu -> VSet.add (fst arc) accu)
-                (Graph.delta_in y graph) VSet.empty)
+                (Graph.delta_in y strct.graph) VSet.empty)
              (VSet.of_list blossom))
         in
         if x = meta_vertex then
@@ -262,97 +320,98 @@ avec x pair & y et z nApp tree & (x,y) nApp couplage & (y,z) app couplage\n";
       in
       let updated_couplage =
         ESet.fold (fun arc accu -> ESet.add (update_arc arc) accu)
-          couplage ESet.empty
+          strct.pairring ESet.empty
       in
-      let (new_new_contracted_graph, new_updated_couplage) =
-        blossom_algorithm (graph, updated_couplage)
+      let new_strct =
+        blossom_algorithm {strct with pairring = updated_couplage}
       in
-      Printf.printf "Graph :\n"; Print.print_delta_out graph;
-      Printf.printf "Contracted_graph :\n"; Print.print_delta_out new_new_contracted_graph;
-      Printf.printf "New couplage :\n"; Print.print_eset new_updated_couplage; Printf.printf "\n";
-      (new_new_contracted_graph, new_updated_couplage)
+      Printf.printf "Graph :\n"; Print.print_delta_out strct.graph;
+      Printf.printf "Contracted_graph :\n"; Print.print_delta_out new_strct.graph;
+      Printf.printf "New couplage :\n"; Print.print_eset new_strct.pairring; Printf.printf "\n";
+      new_strct
 
-  and test_case_c graph couplage tree =
+  and test_case_c strct =
     Printf.printf "Cas C : on cherche (x, y)
 avec x et y pair & (x,y) nApp tree\n";
-    match Cases.case_c graph couplage tree with
+    match Cases.case_c strct.graph strct.pairring strct.tree with
     | Some (edge)->
-      let meta_vertex = find_new_vertex_name graph in
-      let blossom = find_blossom edge tree in
-      let contracted_graph = contract_graph blossom graph meta_vertex in
-      let contracted_tree = contract_tree meta_vertex blossom tree in
-      let contracted_couplage = contract_couplage meta_vertex blossom couplage in
+      let meta_vertex = find_new_vertex_name strct.graph in
+      let blossom = find_blossom edge strct.tree in
+      let contracted_graph = contract_graph blossom strct.graph meta_vertex in
+      let contracted_tree = contract_tree meta_vertex blossom strct.tree in
+      let contracted_couplage = contract_couplage meta_vertex blossom strct.pairring in
       Printf.printf "blossom : "; print_int_list blossom; Printf.printf "\n";
       Print.print_delta_out contracted_graph; Printf.printf "\n";
       Print.print_tree contracted_tree; Printf.printf "\n";
       Print.print_eset contracted_couplage; Printf.printf "\n";
-      let (_, new_couplage) =
-        test_case_a contracted_graph contracted_couplage contracted_tree
+      let newnn =
+        test_case_a {strct with
+                     graph = contracted_graph;
+                     pairring = contracted_couplage;
+                     tree = contracted_tree;}
       in
-      update_couplage meta_vertex blossom graph new_couplage
+      update_couplage meta_vertex blossom {strct with pairring = newnn.pairring}
     | None ->
-      test_case_d graph couplage tree
+      test_case_d strct
 
-  and test_case_d graph couplage tree =
+  and test_case_d strct =
     Printf.printf "Cas D\n";
-    (remove_tree_from_graph graph tree, couplage)
+    {strct with graph = remove_tree_from_graph strct.graph strct.tree}
 
   (* Blossom algorithm *)
 
-  and blossom_algorithm (graph, couplage) =
-    let nb_insature = VSet.cardinal (unsaturated_vertices graph couplage) in
+  and blossom_algorithm strct =
+    let nb_insature =
+      VSet.cardinal (unsaturated_vertices strct.graph strct.pairring) in
     Printf.printf "\n\nCouplage actuel : ";
-    print_eset couplage;
+    print_eset strct.pairring;
     Printf.printf "Nombre de sommets insaturés : %d\n" nb_insature ;
     if nb_insature >= 2 then
       begin
         Printf.printf "On construit un arbre :\n" ;
-        test_case_a graph couplage (init_node graph couplage)
-        |> blossom_algorithm
+        let res =
+          test_case_a {strct with tree = (init_node strct.graph strct.pairring)}
+        in
+        blossom_algorithm res
       end
     else
       begin
         Printf.printf "Plus assez de sommets insaturés\nOn arrete\n";
-        (graph, couplage)
+        strct
       end
 
   (* Initialise l'algorithme *)
-  let init_algorithm graph =
+  let init_algorithm layout graph =
+    let non_oriented_graph =
+      Graph.fold_arcs
+        ~f:(fun (src, dst) accu -> Graph.add_edge src dst accu)
+        graph
+        Graph.empty
+    in
     Random.self_init ();
     Printf.printf "Initialisation\n" ;
-    (graph, ESet.empty)
+    { layout = layout;
+      graph = non_oriented_graph;
+      pairring = Graph.ESet.empty;
+      tree = (NTree.create_node 0 []);
+    }
 
-  let do_blossom graph =
-    graph
-    |> init_algorithm
-    |> blossom_algorithm
+  let do_blossom layout graph =
+    let open JsEmulation.Computation in
+    let init = init_algorithm layout graph in
+    return (blossom_algorithm init)
 end
+
+
 
 let blossom graph layout =
   let open JsEmulation.Computation in
   let open JsEmulation.Computation.Infix in
   observe (JsContext.msg "Initialisation...")
-  >> return (fst (BlossomAlgo.do_blossom graph))
-
-(* Normal Graph *)
-let graph_list1 = [(1,8);(1,2);(1,5);
-                  (2,1);(2,8);(2,3);
-                  (3,5);(3,10);(3,2);(3,9);(3,6);
-                  (4,5);(4,7);(4,6);
-                  (5,1);(5,3);(5,4);(5,7);
-                  (6,4);(6,7);(6,9);(6,3);
-                  (7,5);(7,4);(7,6);
-                  (8,1);(8,2);
-                  (9,3);(9,6); (10,3)]
-
-(* Odd number of vertices *)
-let graph_list2 = [(1,2);(1,3);
-                  (2,1);(2,4);
-                  (3,1);(3,4);(3,5);
-                  (4,2);(4,3);(4,6);(4,7);
-                  (5,3);(5,6);
-                  (6,4);(6,5);(6,7);
-                  (7,4);(7,6)]
+  >> BlossomAlgo.do_blossom layout graph
+  >>= fun strct
+  -> observe (show_blossom_context strct)
+  >> return strct.graph
 
 (* Graph with a blossom *)
 let graph_list3 = [(1,2);(1,4);
@@ -361,100 +420,3 @@ let graph_list3 = [(1,2);(1,4);
                    (4,1);
                    (5,2);(5,3);(5,6);
                    (6,5)]
-
-let graph = Conversion.graph_of_list graph_list3
-
-let _ = BlossomAlgo.do_blossom graph
-
-let _ = ()
-
-
-(*let my_tree_list =
-  [(1,2);(1,3);(1,4);
-   (2,5);(2,6);(2,7);
-   (3,8);(3,9);(3,10);
-   (4,11);(4,12);(4,13);
-   (5,14);(5,15);(5,16);
-   (6,17);(6,18);(6,19);
-   (7,20);(7,21);(7,22);
-   (8,23);(8,24);(8,25);
-   (9,26);(9,27);(9,28)]
-
-  let my_tree = NTree.of_arcs my_tree_list
-  let my_blossom = [13;4;12]*)
-
-
-(*let _ = VSet.elements (saturated_vertices couplage)             (* 1,2,3,6,8,9 *)
-  let _ = VSet.elements (unsaturated_vertices graph couplage)     (* 4,5,7,10 *)
-  let _ = ESet.elements (NTree.eset tree)                       (* [(5,7);(7,4)] *)
-  let _ = VSet.elements (NTree.vset tree)                       (* 5,7,4,6,8 *)
-  let _ = NTree.even_vertices tree                      (* 5,8,4 *)
-  let _ = NTree.uneven_vertices tree                    (* 6,7 *)
-
-  let _ = NTree.even_arcs_to 8 tree
-  let _ = NTree.uneven_arcs_to 8 tree*)
-
-(*let blossom_edge = match  case_c graph couplage tree with | Some(edge) -> edge | None -> (0,0)
-  let my_blossom = find_blossom blossom_edge tree
-  let new_tree = remove_blossom_from_tree blossom_edge tree
-  let new_graph = contract_blossom_in_graph my_blossom graph*)
-
-(*let _ = print_tree tree*)
-
-(*let x =
-  Graph.empty
-  |> Graph.add_arc ~src:1 ~dst:2
-  |> Graph.add_arc ~src:2 ~dst:1
-  |> Graph.remove_vertex 2
-  let _ = print_delta_in x
-  let _ = print_delta_out x*)
-
-(*
-let list = [(1,2);(1,3);(1,4);(1,5);
-            (2,6);(2,7);(2,8);(2,9);
-            (3,10);(3,11);(3,12);(3,13);
-            (4,14);(4,15);(4,16);(4,17);
-            (5,18);(5,19);(5,20);(5,21);
-            (6,22);(6,23);(6,24);(6,25);
-            (11,26);(11,27);(11,28)]
-let tree = Tree.of_arcs list
-open NTree
-let _ = value tree (* 1 *)
-let _ = childs tree (* 5 4 3 2 *)
-let _ = find 5 tree (* Node (5, [21, 20, 19, 18]) *)
-let _ = vertices tree (* 1 2 3 4 ... 28 *)
-let _ = arcs tree  (* (1,2) (2,6) (6,22) ... (2,7) ... (5,21) *)
-let _ = path_to 28 tree (* 28 11 3 1 *)
-let _ = path_from_to 3 26 tree (* 3 11 26 *)
-let _ = even_vertices tree (* 1 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 *)
-let _ = uneven_vertices tree (* 2 22 23 24 25 3 26 27 28 4 5 *)
-let _ = even_arcs tree (* (1,2) (6,22...)) (1,3) (11, 26...) (1,4) (1,5) *)
-let _ = uneven_arcs tree (* (2,6...) (3,10...) (4,14...) (5,18...) *)
-let _ = even_path_to 28 tree (* 11 1 *)
-let _ = uneven_path_to 28 tree (* 28 3 *)
-let _ = even_arcs_to 28 tree (* 28,11 3,1*)
-let _ = uneven_arcs_to 28 tree (* 11,3 *)
-let _ = depth tree
-let _ = size tree
-let a = match find 28 tree with | Some (a) ->a | None -> create_node 0
-let _ = is_leaf a
-let _ = add (27, 28) tree (* TODO if mem (fst edge) then tree else add *)
-let _ = Graph.ESet.elements (eset tree)
-let _ = Graph.VSet.elements (vset tree)
-let _ = iter (function node -> print_int (value node); Printf.printf " ") tree
-let _ = print tree
-let _ = create_node 5
-let _ = mem (29) tree
-let _ = add (18,1) tree
-let _ = add (0,100) tree
-let _ = add (16,30) tree
-let _ = remove 5 tree
-*)
-
-
-(*let list = [(1,2);(2,3);(2,13);(3,4);(4,5);(4,6);(3,7);(7,8);(8,10);(7,9);(9,14);(9,11);(9,12);(12,15)]
-  let tree = Tree.of_arcs list
-  let path = [2;3;7]
-  let a = Tree.find_vertices path tree
-  let _ = List.map (fun node -> Tree.remove_vertices path  node) a
-  let _ = Tree.contract_path (-1) path tree*)

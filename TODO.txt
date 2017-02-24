@@ -1,16 +1,17 @@
 Pour chaque printf
 Regarder si on peut les transformer en fonctions pour qu'il y ait le moins de code d'affichage
 Regarder où afficher quoi au bon moment pour bien expliquer ce qui se passe
-Faire le code de base d'Observer (la console)
-Monadiser le code.... (le plus long)
+
+TODO Réinitialiser strct quand nécéssaire (regarder les arguments des fonctions dans blossom_clean.ml)
+TODO Remplacer ['couplage', 'pairring'] par 'pairing'
+
+PROCESSING Monadiser le code.... (le plus long)
+
+DONE Faire le code de base d'Observer (la console)
+
 
 
 Comment afficher ?
 
-afficher graphe+couplage+nonsaturés
-afficher graphe+couplage+nonsaturés+arbre
-
-couplage : rouge
-arbre : vert ?
-Comment afficher arbre+couplage
-saturé : rouge
+couplage : arc(rouge)
+arbre : vertex(vert & bleu)

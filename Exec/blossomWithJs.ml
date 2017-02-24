@@ -29,9 +29,7 @@ let register_blossom graph_name (graph, layout) =
   else
     let computation = Blossom.blossom graph layout in
     let continuation tree =
-      Console.add
-        (Printf.sprintf "%s_tree" graph_name)
-        (tree, layout)
+      Console.empty_messages
     in
     Console.register computation continuation
 
