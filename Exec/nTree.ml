@@ -312,7 +312,7 @@ let rec iter f = function
 
 (* Constructors *)
 
-let create_node v lst = Node(v, [])
+let create_node v lst = Node(v, lst)
 let of_arcs lst =
   List.fold_left (fun tree arc -> add arc tree) (create_node (fst (List.hd lst)) []) lst
 let of_eset arcs = of_arcs (Graph.ESet.elements arcs)
