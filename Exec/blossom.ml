@@ -9,6 +9,13 @@ struct
     tree : NTree.t;
   }
 
+  let empty_strct = {
+    layout = (fun a -> Gg.P2.o);
+    graph = Graph.empty;
+    matching = Graph.ESet.empty;
+    tree = NTree.empty;
+  }
+
   let rec mem_matching vertex set =
     let rec xx = function
       | (a, b)::next ->
@@ -287,7 +294,8 @@ avec x pair & x et y nApp (matching U tree)\n";
     | Some (edge)->
       {strct with
        matching = add_path_to_matching strct.matching
-                    (NTree.add edge strct.tree) (snd edge) }
+           (NTree.add edge strct.tree) (snd edge);
+       tree = NTree.empty}
     | None ->
       test_case_b strct
 
@@ -328,7 +336,7 @@ avec x pair & y et z nApp tree & (x,y) nApp matching & (y,z) app matching\n";
       Printf.printf "Graph :\n"; Print.print_delta_out strct.graph;
       Printf.printf "Contracted_graph :\n"; Print.print_delta_out new_strct.graph;
       Printf.printf "New matching :\n"; Print.print_eset new_strct.matching; Printf.printf "\n";
-      new_strct
+      {new_strct with tree = NTree.empty}
 
   and test_case_c strct =
     Printf.printf "Cas C : on cherche (x, y)
@@ -350,13 +358,18 @@ avec x et y pair & (x,y) nApp tree\n";
                      matching = contracted_matching;
                      tree = contracted_tree;}
       in
-      update_matching meta_vertex blossom {strct with matching = newnn.matching}
+      update_matching
+        meta_vertex
+        blossom
+        {strct with matching = newnn.matching; tree = NTree.empty;}
     | None ->
       test_case_d strct
 
   and test_case_d strct =
     Printf.printf "Cas D\n";
-    {strct with graph = remove_tree_from_graph strct.graph strct.tree}
+    {strct with
+      graph = remove_tree_from_graph strct.graph strct.tree;
+      tree = NTree.empty;}
 
   (* Blossom algorithm *)
 
@@ -370,14 +383,15 @@ avec x et y pair & (x,y) nApp tree\n";
       begin
         Printf.printf "On construit un arbre :\n" ;
         let res =
-          test_case_a {strct with tree = (init_node strct.graph strct.matching)}
+          test_case_a {strct with
+                       tree = (init_node strct.graph strct.matching)}
         in
         blossom_algorithm res
       end
     else
       begin
         Printf.printf "Plus assez de sommets insaturés\nOn arrete\n";
-        strct
+        {strct with tree = NTree.empty}
       end
 
   (* Initialise l'algorithme *)
@@ -390,10 +404,9 @@ avec x et y pair & (x,y) nApp tree\n";
     in
     Random.self_init ();
     Printf.printf "Initialisation\n" ;
-    { layout = layout;
+    { Self.empty_strct with
+      layout = layout;
       graph = non_oriented_graph;
-      matching = Graph.ESet.empty;
-      tree = (NTree.create_node 0 []);
     }
 
   let do_blossom layout graph =

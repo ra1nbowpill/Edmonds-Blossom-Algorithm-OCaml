@@ -2,13 +2,14 @@ Pour chaque printf
 Regarder si on peut les transformer en fonctions pour qu'il y ait le moins de code d'affichage
 Regarder où afficher quoi au bon moment pour bien expliquer ce qui se passe
 
-TODO Réinitialiser strct quand nécéssaire (regarder les arguments des fonctions dans blossom_clean.ml)
+
+TODO Ajouter blossom a strct
 
 PROCESSING Monadiser le code.... (le plus long)
 
 DONE Faire le code de base d'Observer (la console)
 DONE Remplacer ['couplage', 'pairring'] par 'matching'
-
+DONE Réinitialiser strct quand nécéssaire (regarder les arguments des fonctions dans blossom_clean.ml) (il suffit de réinitialiser tree dans les 'return')
 
 
 Comment afficher ?
