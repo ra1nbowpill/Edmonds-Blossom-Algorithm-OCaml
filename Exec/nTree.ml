@@ -312,6 +312,7 @@ let rec iter f = function
 
 (* Constructors *)
 
+let empty = Node(-1, [])
 let create_node v lst = Node(v, lst)
 let of_arcs lst =
   List.fold_left (fun tree arc -> add arc tree) (create_node (fst (List.hd lst)) []) lst

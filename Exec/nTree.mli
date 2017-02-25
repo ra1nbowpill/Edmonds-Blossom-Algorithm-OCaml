@@ -87,6 +87,7 @@ val iter : (t -> 'a) -> t -> unit
 
 (* Constructors *)
 
+val empty : t
 val create_node : Graph.vertex -> t list -> t
 val of_arcs : (Graph.vertex * Graph.vertex) list -> t
 val of_eset : Graph.ESet.t -> t
