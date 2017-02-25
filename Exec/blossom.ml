@@ -7,6 +7,7 @@ struct
     graph : Graph.t;         (* Le graphe d'origine *)
     matching : Graph.ESet.t;          (* L'arbre couvrant *)
     tree : NTree.t;
+    blossom : Graph.vertex list;
   }
 
   let empty_strct = {
@@ -14,6 +15,7 @@ struct
     graph = Graph.empty;
     matching = Graph.ESet.empty;
     tree = NTree.empty;
+    blossom = [];
   }
 
   let rec mem_matching vertex set =
@@ -24,6 +26,21 @@ struct
       | [] -> false
     in
     xx (Graph.ESet.elements set)
+
+  let rec arcs_of_vertices = function
+    | v1::v2::next -> (v1, v2)::(arcs_of_vertices (v2::next))
+    | v::[] -> []
+    | [] -> []
+
+  let arcs_of_vertices_looped vertices =
+    if vertices == [] then [] else
+    let rec last = function
+      | elt::[] -> elt
+      | n::ext -> last ext
+      | [] -> failwith "oupsi"
+    in
+    let arcs = arcs_of_vertices vertices in
+    (List.hd vertices, last vertices)::arcs
 
   let vertex_properties strct vertex =
     let open MoreImage in
@@ -36,8 +53,15 @@ struct
 
   let arc_properties strct ((src, dst) as arc) =
     let open MoreImage in
-    if Graph.ESet.mem arc strct.matching
-        || Graph.ESet.mem (snd arc, fst arc) strct.matching then
+    let blossom = arcs_of_vertices_looped strct.blossom in
+    if List.mem arc blossom
+        || List.mem (dst, src) blossom then
+      Properties.([
+          drawing_color (Gg.Color.green);
+          draw_triangle (false);
+        ])
+    else if Graph.ESet.mem arc strct.matching
+        || Graph.ESet.mem (dst, src) strct.matching then
       Properties.([
           drawing_color (Gg.Color.red);
           draw_triangle (false);
