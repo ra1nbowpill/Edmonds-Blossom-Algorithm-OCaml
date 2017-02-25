@@ -6,13 +6,13 @@ module Cases = struct
   open Print
   open MoreGraph
 
-  let case_a graph couplage tree =
+  let case_a graph matching tree =
     let even_v = NTree.even_vertices tree in
     let compute_solutions vertex =
       VSet.diff
         (Graph.out_neighbours vertex graph)
         (VSet.union
-           (saturated_vertices couplage)
+           (saturated_vertices matching)
            (NTree.vset tree))
     in
     let solutions =
@@ -33,20 +33,20 @@ module Cases = struct
     in
     chosen
 
-  let case_b graph couplage tree =
+  let case_b graph matching tree =
     let even_v = NTree.even_vertices tree in
     let compute_ys vertex =
       VSet.diff
         (Graph.out_neighbours vertex graph)
         (VSet.union
            (NTree.vset tree)
-           (couplage_neighboors_of vertex couplage))
+           (matching_neighboors_of vertex matching))
     in
     let compute_zs vertex =
       VSet.diff
         (VSet.inter
            (Graph.out_neighbours vertex graph)
-           (couplage_neighboors_of vertex couplage))
+           (matching_neighboors_of vertex matching))
         (VSet.add vertex (NTree.vset tree))
     in
     let blabla f lst=
@@ -72,14 +72,14 @@ module Cases = struct
     in
     chosen
 
-  let case_c graph couplage tree =
+  let case_c graph matching tree =
     let even_v = NTree.even_vertices tree in
     let neighboors_in_tree_edge_not_in vertex =
       VSet.diff
         (VSet.inter
            (VSet.remove vertex (VSet.of_list even_v))
            (Graph.out_neighbours vertex graph))
-        (couplage_neighboors_of vertex couplage)
+        (matching_neighboors_of vertex matching)
     in
     let solutions =
       List.fold_left (fun accu vertex ->
@@ -195,24 +195,24 @@ module BlossomAlgo = struct
       (min_depth_vertex blossom tree)
       meta_vertex (contract (to_contract blossom tree) tree)
 
-  let contract_couplage meta_vertex blossom couplage =
+  let contract_matching meta_vertex blossom matching =
     let update_vertex v = if List.mem v blossom then meta_vertex else v in
-    let updated_couplage =
+    let updated_matching =
       ESet.fold (fun (x, y) accu -> ESet.add (update_vertex x, update_vertex y) accu)
-      couplage ESet.empty
+      matching ESet.empty
     in
-    ESet.filter (fun (x, y) -> x <> y) updated_couplage
+    ESet.filter (fun (x, y) -> x <> y) updated_matching
 
-  let add_path_to_couplage couplage tree last =
+  let add_path_to_matching matching tree last =
     ESet.union
       (ESet.of_list (NTree.even_arcs_to last tree))
       (ESet.diff
-         couplage
+         matching
          (ESet.of_list (unoriented_arcs (NTree.uneven_arcs_to last tree))))
 
 
-  let init_node graph couplage =
-    let solutions = unsaturated_vertices graph couplage in
+  let init_node graph matching =
+    let solutions = unsaturated_vertices graph matching in
     let chosen =
       VSet.choose solutions
     in
@@ -220,30 +220,30 @@ module BlossomAlgo = struct
 
   (* Actions for cases *)
 
-  let rec test_case_a graph couplage tree =
+  let rec test_case_a graph matching tree =
     Printf.printf "\n";
     Printf.printf "Tree : "; print_tree tree; Printf.printf "\n";
     Printf.printf "Cas A : On cherche (x,y)
-avec x pair & x et y nApp (couplage U tree)\n";
-    match Cases.case_a graph couplage tree with
+avec x pair & x et y nApp (matching U tree)\n";
+    match Cases.case_a graph matching tree with
     | Some (edge)->
-      (graph, add_path_to_couplage couplage (NTree.add edge tree) (snd edge))
+      (graph, add_path_to_matching matching (NTree.add edge tree) (snd edge))
     | None ->
-      test_case_b graph couplage tree
+      test_case_b graph matching tree
 
-  and test_case_b graph couplage tree =
+  and test_case_b graph matching tree =
     Printf.printf "Cas B : On cherche (x,y)(y,z)
-avec x pair & y et z nApp tree & (x,y) nApp couplage & (y,z) app couplage\n";
-    match Cases.case_b graph couplage tree with
+avec x pair & y et z nApp tree & (x,y) nApp matching & (y,z) app matching\n";
+    match Cases.case_b graph matching tree with
     | Some (x, y, z)->
       test_case_a
         graph
-        couplage
+        matching
         (NTree.add (y, z) (NTree.add (x, y) tree))
     | None ->
-      test_case_c graph couplage tree
+      test_case_c graph matching tree
 
-  and update_couplage meta_vertex blossom graph couplage =
+  and update_matching meta_vertex blossom graph matching =
       let update_arc (x,y) =
         let a y =
           (VSet.inter
@@ -260,60 +260,60 @@ avec x pair & y et z nApp tree & (x,y) nApp couplage & (y,z) app couplage\n";
         else
           (x,y)
       in
-      let updated_couplage =
+      let updated_matching =
         ESet.fold (fun arc accu -> ESet.add (update_arc arc) accu)
-          couplage ESet.empty
+          matching ESet.empty
       in
-      let (new_new_contracted_graph, new_updated_couplage) =
-        blossom_algorithm (graph, updated_couplage)
+      let (new_new_contracted_graph, new_updated_matching) =
+        blossom_algorithm (graph, updated_matching)
       in
       Printf.printf "Graph :\n"; Print.print_delta_out graph;
       Printf.printf "Contracted_graph :\n"; Print.print_delta_out new_new_contracted_graph;
-      Printf.printf "New couplage :\n"; Print.print_eset new_updated_couplage; Printf.printf "\n";
-      (new_new_contracted_graph, new_updated_couplage)
+      Printf.printf "New matching :\n"; Print.print_eset new_updated_matching; Printf.printf "\n";
+      (new_new_contracted_graph, new_updated_matching)
 
-  and test_case_c graph couplage tree =
+  and test_case_c graph matching tree =
     Printf.printf "Cas C : on cherche (x, y)
 avec x et y pair & (x,y) nApp tree\n";
-    match Cases.case_c graph couplage tree with
+    match Cases.case_c graph matching tree with
     | Some (edge)->
       let meta_vertex = find_new_vertex_name graph in
       let blossom = find_blossom edge tree in
       let contracted_graph = contract_graph blossom graph meta_vertex in
       let contracted_tree = contract_tree meta_vertex blossom tree in
-      let contracted_couplage = contract_couplage meta_vertex blossom couplage in
+      let contracted_matching = contract_matching meta_vertex blossom matching in
       Printf.printf "blossom : "; print_int_list blossom; Printf.printf "\n";
       Print.print_delta_out contracted_graph; Printf.printf "\n";
       Print.print_tree contracted_tree; Printf.printf "\n";
-      Print.print_eset contracted_couplage; Printf.printf "\n";
-      let (_, new_couplage) =
-        test_case_a contracted_graph contracted_couplage contracted_tree
+      Print.print_eset contracted_matching; Printf.printf "\n";
+      let (_, new_matching) =
+        test_case_a contracted_graph contracted_matching contracted_tree
       in
-      update_couplage meta_vertex blossom graph new_couplage
+      update_matching meta_vertex blossom graph new_matching
     | None ->
-      test_case_d graph couplage tree
+      test_case_d graph matching tree
 
-  and test_case_d graph couplage tree =
+  and test_case_d graph matching tree =
     Printf.printf "Cas D\n";
-    (remove_tree_from_graph graph tree, couplage)
+    (remove_tree_from_graph graph tree, matching)
 
   (* Blossom algorithm *)
 
-  and blossom_algorithm (graph, couplage) =
-    let nb_insature = VSet.cardinal (unsaturated_vertices graph couplage) in
-    Printf.printf "\n\nCouplage actuel : ";
-    print_eset couplage;
+  and blossom_algorithm (graph, matching) =
+    let nb_insature = VSet.cardinal (unsaturated_vertices graph matching) in
+    Printf.printf "\n\nmatching actuel : ";
+    print_eset matching;
     Printf.printf "Nombre de sommets insaturés : %d\n" nb_insature ;
     if nb_insature >= 2 then
       begin
         Printf.printf "On construit un arbre :\n" ;
-        test_case_a graph couplage (init_node graph couplage)
+        test_case_a graph matching (init_node graph matching)
         |> blossom_algorithm
       end
     else
       begin
         Printf.printf "Plus assez de sommets insaturés\nOn arrete\n";
-        (graph, couplage)
+        (graph, matching)
       end
 
   (* Initialise l'algorithme *)
@@ -378,8 +378,8 @@ let _ = ()
   let my_blossom = [13;4;12]*)
 
 
-(*let _ = VSet.elements (saturated_vertices couplage)             (* 1,2,3,6,8,9 *)
-  let _ = VSet.elements (unsaturated_vertices graph couplage)     (* 4,5,7,10 *)
+(*let _ = VSet.elements (saturated_vertices matching)             (* 1,2,3,6,8,9 *)
+  let _ = VSet.elements (unsaturated_vertices graph matching)     (* 4,5,7,10 *)
   let _ = ESet.elements (NTree.eset tree)                       (* [(5,7);(7,4)] *)
   let _ = VSet.elements (NTree.vset tree)                       (* 5,7,4,6,8 *)
   let _ = NTree.even_vertices tree                      (* 5,8,4 *)
@@ -388,7 +388,7 @@ let _ = ()
   let _ = NTree.even_arcs_to 8 tree
   let _ = NTree.uneven_arcs_to 8 tree*)
 
-(*let blossom_edge = match  case_c graph couplage tree with | Some(edge) -> edge | None -> (0,0)
+(*let blossom_edge = match  case_c graph matching tree with | Some(edge) -> edge | None -> (0,0)
   let my_blossom = find_blossom blossom_edge tree
   let new_tree = remove_blossom_from_tree blossom_edge tree
   let new_graph = contract_blossom_in_graph my_blossom graph*)

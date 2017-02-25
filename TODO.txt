@@ -3,11 +3,11 @@ Regarder si on peut les transformer en fonctions pour qu'il y ait le moins de co
 Regarder où afficher quoi au bon moment pour bien expliquer ce qui se passe
 
 TODO Réinitialiser strct quand nécéssaire (regarder les arguments des fonctions dans blossom_clean.ml)
-TODO Remplacer ['couplage', 'pairring'] par 'pairing'
 
 PROCESSING Monadiser le code.... (le plus long)
 
 DONE Faire le code de base d'Observer (la console)
+DONE Remplacer ['couplage', 'pairring'] par 'matching'
 
 
 
