@@ -66,7 +66,8 @@ let draw_graph_action graph_name () =
          graph_name
          (graph,
           fun vertex ->
-            Graph.VMap.unsafe_find vertex layout
+            Graph.VMap.find vertex layout
+            |> MoreOption.default (Gg.P2.v 0. 0.)
          )
     )
 
