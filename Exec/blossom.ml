@@ -95,7 +95,6 @@ let show_blossom_context ctxt =
 module Cases = struct
   module VSet = Graph.VSet
   module ESet = Graph.ESet
-  open Print
   open MoreGraph
 
   let case_a graph matching tree =
@@ -116,12 +115,10 @@ module Cases = struct
         ESet.empty even_v
     in
     let choose = ESet.choose in
-    print_eset solutions;Printf.printf "\n";
     let chosen =
       if ESet.is_empty solutions then None
       else
-        (print_arc (choose solutions); Printf.printf "\n";
-         Some(choose solutions))
+         Some(choose solutions)
     in
     chosen
 
@@ -154,13 +151,11 @@ module Cases = struct
     in
     let solutions = for_each_x even_v in
     let choose = List.hd in
-    print_list (fun (x,y,z) -> Printf.printf "(%d,%d,%d)" x y z) solutions;
-    Printf.printf "\n";
     let chosen =
       if solutions = [] then None
       else
         let (x,y,z) as sol = choose solutions in
-        Printf.printf "(%d,%d,%d)" x y z; Some(sol)
+        Some(sol)
     in
     chosen
 
@@ -180,12 +175,11 @@ module Cases = struct
         [] even_v
     in
     let choose = List.hd in
-    print_arc_list solutions; Printf.printf "\n";
     let chosen =
       if solutions = [] then None
       else
         let sol = choose solutions in
-        print_arc sol; Printf.printf "\n"; Some(sol)
+        Some(sol)
     in
     chosen
 end
@@ -193,7 +187,6 @@ end
 module BlossomAlgo = struct
   module VSet = Graph.VSet
   module ESet = Graph.ESet
-  open Print
   open Conversion
   open MoreGraph
 
@@ -316,10 +309,6 @@ module BlossomAlgo = struct
   open JsEmulation.Computation.Infix
 
   let rec test_case_a strct =
-    Printf.printf "\n";
-    Printf.printf "Tree : "; print_tree strct.tree; Printf.printf "\n";
-    Printf.printf "Cas A : On cherche (x,y)
-avec x pair & x et y nApp (matching U tree)\n";
     match Cases.case_a strct.graph strct.matching strct.tree with
     | Some (edge)->
       observe (JsContext.msg "On augmente l'arbre")
@@ -335,8 +324,6 @@ avec x pair & x et y nApp (matching U tree)\n";
       test_case_b strct
 
   and test_case_b strct =
-    Printf.printf "Cas B : On cherche (x,y)(y,z)
-avec x pair & y et z nApp tree & (x,y) nApp matching & (y,z) app matching\n";
     match Cases.case_b strct.graph strct.matching strct.tree with
     | Some (x, y, z)->
       let up_strct =
@@ -373,14 +360,10 @@ avec x pair & y et z nApp tree & (x,y) nApp matching & (y,z) app matching\n";
       in
       blossom_algorithm {strct with matching = updated_matching}
       >>= fun new_strct
-      -> Printf.printf "Graph :\n"; Print.print_delta_out strct.graph;
-      Printf.printf "Contracted_graph :\n"; Print.print_delta_out new_strct.graph;
-      Printf.printf "New matching :\n"; Print.print_eset new_strct.matching; Printf.printf "\n";
-      return {new_strct with tree = NTree.empty}
+      -> return {new_strct with tree = NTree.empty}
+        (* new_strct.graph is the contracted graph *)
 
   and test_case_c strct =
-    Printf.printf "Cas C : on cherche (x, y)
-avec x et y pair & (x,y) nApp tree\n";
     match Cases.case_c strct.graph strct.matching strct.tree with
     | Some (edge)->
       let meta_vertex = find_new_vertex_name strct.graph in
@@ -388,14 +371,12 @@ avec x et y pair & (x,y) nApp tree\n";
       let contracted_graph = contract_graph blossom strct.graph meta_vertex in
       let contracted_tree = contract_tree meta_vertex blossom strct.tree in
       let contracted_matching = contract_matching meta_vertex blossom strct.matching in
-      Printf.printf "blossom : "; print_int_list blossom; Printf.printf "\n";
-      Print.print_delta_out contracted_graph; Printf.printf "\n";
-      Print.print_tree contracted_tree; Printf.printf "\n";
-      Print.print_eset contracted_matching; Printf.printf "\n";
-      observe (JsContext.msg "On a trouvé une infloraison")
+      observe (JsContext.msg "On a trouvé une inflorescence")
       >> observe (JsContext.end_line)
       >> observe (show_blossom_context {strct with blossom = blossom})
       >> observe (JsContext.increment)
+      >> observe (JsContext.msg "la on va in-depth pour trouver le couplage sans l'inflorescence il faudrais afficher plus de truc pour etre plus précis")
+      >> observe (JsContext.end_line)
       >> test_case_a {strct with
                    graph = contracted_graph;
                    matching = contracted_matching;
@@ -410,7 +391,6 @@ avec x et y pair & (x,y) nApp tree\n";
       test_case_d strct
 
   and test_case_d strct =
-    Printf.printf "Cas D\n";
     observe (JsContext.msg "On ne peut trouver de couplage dans cet arbre, on l'enlève du graphe (Il faudrait rappeller test_case_a et update_couplage comme après un blossom)")
     >> observe (JsContext.end_line)
     >> return {strct with
