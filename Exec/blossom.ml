@@ -45,11 +45,14 @@ struct
   let vertex_properties strct vertex =
     let open MoreImage in
     if List.mem vertex (NTree.even_vertices strct.tree) then
-      Properties.([drawing_color (Gg.Color.green)])
+      Properties.([drawing_color (Gg.Color.v_srgbi 63 169 242); (*bleu*)
+                   linewidth (0.03);])
     else if List.mem vertex (NTree.uneven_vertices strct.tree) then
-      Properties.([drawing_color (Gg.Color.blue)])
+      Properties.([drawing_color (Gg.Color.v_srgbi 95 197 64); (*vert*)
+                   linewidth (0.03);])
     else
       Properties.([drawing_color (Gg.Color.black)])
+
 
   let arc_properties strct ((src, dst) as arc) =
     let open MoreImage in
@@ -309,6 +312,9 @@ module BlossomAlgo = struct
 
   (* Actions for cases *)
 
+  open JsEmulation.Computation
+  open JsEmulation.Computation.Infix
+
   let rec test_case_a strct =
     Printf.printf "\n";
     Printf.printf "Tree : "; print_tree strct.tree; Printf.printf "\n";
@@ -316,7 +322,12 @@ module BlossomAlgo = struct
 avec x pair & x et y nApp (matching U tree)\n";
     match Cases.case_a strct.graph strct.matching strct.tree with
     | Some (edge)->
-      {strct with
+      observe (JsContext.msg "On augmente l'arbre")
+      >> observe (JsContext.end_line)
+      >> observe (show_blossom_context {strct with tree = NTree.add edge strct.tree})
+      >> observe (JsContext.msg "On ajoute l'arbre au couplage")
+      >> observe (JsContext.end_line)
+      >> return {strct with
        matching = add_path_to_matching strct.matching
            (NTree.add edge strct.tree) (snd edge);
        tree = NTree.empty}
@@ -328,8 +339,14 @@ avec x pair & x et y nApp (matching U tree)\n";
 avec x pair & y et z nApp tree & (x,y) nApp matching & (y,z) app matching\n";
     match Cases.case_b strct.graph strct.matching strct.tree with
     | Some (x, y, z)->
-      test_case_a {strct with
-                   tree = NTree.add (y, z) (NTree.add (x, y) strct.tree) }
+      let up_strct =
+        {strct with
+         tree = NTree.add (y, z) (NTree.add (x, y) strct.tree) }
+      in
+      observe (JsContext.msg "On augmente l'arbre")
+      >> observe (JsContext.end_line)
+      >> observe (show_blossom_context up_strct)
+      >> test_case_a up_strct
     | None ->
       test_case_c strct
 
@@ -354,13 +371,12 @@ avec x pair & y et z nApp tree & (x,y) nApp matching & (y,z) app matching\n";
         ESet.fold (fun arc accu -> ESet.add (update_arc arc) accu)
           strct.matching ESet.empty
       in
-      let new_strct =
-        blossom_algorithm {strct with matching = updated_matching}
-      in
-      Printf.printf "Graph :\n"; Print.print_delta_out strct.graph;
+      blossom_algorithm {strct with matching = updated_matching}
+      >>= fun new_strct
+      -> Printf.printf "Graph :\n"; Print.print_delta_out strct.graph;
       Printf.printf "Contracted_graph :\n"; Print.print_delta_out new_strct.graph;
       Printf.printf "New matching :\n"; Print.print_eset new_strct.matching; Printf.printf "\n";
-      {new_strct with tree = NTree.empty}
+      return {new_strct with tree = NTree.empty}
 
   and test_case_c strct =
     Printf.printf "Cas C : on cherche (x, y)
@@ -376,13 +392,17 @@ avec x et y pair & (x,y) nApp tree\n";
       Print.print_delta_out contracted_graph; Printf.printf "\n";
       Print.print_tree contracted_tree; Printf.printf "\n";
       Print.print_eset contracted_matching; Printf.printf "\n";
-      let newnn =
-        test_case_a {strct with
-                     graph = contracted_graph;
-                     matching = contracted_matching;
-                     tree = contracted_tree;}
-      in
-      update_matching
+      observe (JsContext.msg "On a trouvé une infloraison")
+      >> observe (JsContext.end_line)
+      >> observe (show_blossom_context {strct with blossom = blossom})
+      >> observe (JsContext.increment)
+      >> test_case_a {strct with
+                   graph = contracted_graph;
+                   matching = contracted_matching;
+                   tree = contracted_tree;}
+      >>= fun newnn
+      -> observe (JsContext.decrement)
+      >> update_matching
         meta_vertex
         blossom
         {strct with matching = newnn.matching; tree = NTree.empty;}
@@ -391,7 +411,9 @@ avec x et y pair & (x,y) nApp tree\n";
 
   and test_case_d strct =
     Printf.printf "Cas D\n";
-    {strct with
+    observe (JsContext.msg "On ne peut trouver de couplage dans cet arbre, on l'enlève du graphe (Il faudrait rappeller test_case_a et update_couplage comme après un blossom)")
+    >> observe (JsContext.end_line)
+    >> return {strct with
       graph = remove_tree_from_graph strct.graph strct.tree;
       tree = NTree.empty;}
 
@@ -400,22 +422,23 @@ avec x et y pair & (x,y) nApp tree\n";
   and blossom_algorithm strct =
     let nb_insature =
       VSet.cardinal (unsaturated_vertices strct.graph strct.matching) in
-    Printf.printf "\n\nmatching actuel : ";
-    print_eset strct.matching;
-    Printf.printf "Nombre de sommets insaturés : %d\n" nb_insature ;
     if nb_insature >= 2 then
       begin
-        Printf.printf "On construit un arbre :\n" ;
-        let res =
-          test_case_a {strct with
-                       tree = (init_node strct.graph strct.matching)}
+        let up_strct =
+          {strct with
+           tree = (init_node strct.graph strct.matching)}
         in
-        blossom_algorithm res
+        observe (JsContext.msg "Initialisation de l'arbre")
+        >> observe (JsContext.end_line)
+        >> observe (show_blossom_context up_strct)
+        >> test_case_a up_strct
+        >>= fun res
+        -> observe (show_blossom_context res)
+        >> blossom_algorithm res
       end
     else
       begin
-        Printf.printf "Plus assez de sommets insaturés\nOn arrete\n";
-        {strct with tree = NTree.empty}
+        return {strct with tree = NTree.empty}
       end
 
   (* Initialise l'algorithme *)
@@ -427,7 +450,6 @@ avec x et y pair & (x,y) nApp tree\n";
         Graph.empty
     in
     Random.self_init ();
-    Printf.printf "Initialisation\n" ;
     { Self.empty_strct with
       layout = layout;
       graph = non_oriented_graph;
@@ -436,7 +458,7 @@ avec x et y pair & (x,y) nApp tree\n";
   let do_blossom layout graph =
     let open JsEmulation.Computation in
     let init = init_algorithm layout graph in
-    return (blossom_algorithm init)
+    blossom_algorithm init
 end
 
 
@@ -445,10 +467,10 @@ let blossom graph layout =
   let open JsEmulation.Computation in
   let open JsEmulation.Computation.Infix in
   observe (JsContext.msg "Initialisation...")
+  >> observe (JsContext.end_line)
   >> BlossomAlgo.do_blossom layout graph
   >>= fun strct
-  -> observe (show_blossom_context strct)
-  >> return strct.graph
+  -> return strct.graph
 
 (* Graph with a blossom *)
 let graph_list3 = [(1,2);(1,4);

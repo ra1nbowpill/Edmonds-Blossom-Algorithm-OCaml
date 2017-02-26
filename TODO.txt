@@ -3,16 +3,22 @@ Regarder si on peut les transformer en fonctions pour qu'il y ait le moins de co
 Regarder où afficher quoi au bon moment pour bien expliquer ce qui se passe
 
 
-
-PROCESSING Monadiser le code.... (le plus long)
+TODO Debugger le cas D (faire comme après une inflorescence)
+TODO Bug avec le graphe aa.svg
+TODO Insérer des graphes par défaut
+TODO Mettre des pay
+TODO Afficher plus simplement (essayer de ne pas avoir besoin de créer une nouvelle structure pour un nouvel affichage)
+TODO Afficher un ordre sur les noeuds de l'arbre
 
 DONE Faire le code de base d'Observer (la console)
 DONE Remplacer ['couplage', 'pairring'] par 'matching'
 DONE Réinitialiser strct quand nécéssaire (regarder les arguments des fonctions dans blossom_clean.ml) (il suffit de réinitialiser tree dans les 'return')
 DONE Ajouter blossom a strct
+DONE Monadiser le code.... (le plus long)
+
 
 
 Comment afficher ?
 
 couplage : arc(rouge)
-arbre : vertex(vert & bleu)
+arbre : vertex(vert & bleu) (il faudrais aussi afficher quelque chose sur les arcs et surtout avoir un ordre)
